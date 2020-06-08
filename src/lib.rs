@@ -25,13 +25,21 @@ extern crate wee_alloc;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use js_sys::TypeError;
-use secp256k1::{Message, Secp256k1, SecretKey};
+use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 pub use secp256k1_sys as ffi;
+use secp256k1_sys::CPtr;
 use wasm_bindgen::prelude::*;
 
 // Dummy Node.js Buffer type
 // TODO: Replace appropriate type. It might be good to subdivide into `Point`, `Scaler`, etc.
 type JsBuffer = Box<[u8]>;
+
+pub fn is_point(ctx_ptr: *const ffi::Context, p: JsBuffer, pubkey: &mut ffi::PublicKey) -> bool {
+    if p.len() != 33 && p.len() != 65 {
+        return false;
+    }
+    unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), p.len()) != 0 }
+}
 
 #[wasm_bindgen]
 pub struct TinySecp {
@@ -52,26 +60,23 @@ impl TinySecp {
         if p.len() != 33 && p.len() != 65 {
             return false;
         }
-        unsafe {
-            ffi::secp256k1_ec_pubkey_parse(
-                ffi::secp256k1_context_no_precomp,
-                &mut ffi::PublicKey::new(),
-                p.as_ptr(),
-                p.len(),
-            ) != 0
-        }
+        is_point(*self.secp.ctx(), p, &mut ffi::PublicKey::new())
     }
 
     #[wasm_bindgen(js_name = isPointCompressed)]
     #[allow(unused_variables)]
-    pub fn is_point_compressed(&self, p: JsBuffer) -> bool {
-        p.len() == 33 && self.is_point(p)
+    pub fn is_point_compressed(&self, p: JsBuffer) -> Result<bool, JsValue> {
+        let has_proper_len = p.len() == 33;
+        if !self.is_point(p) {
+            return Err(JsValue::from(TypeError::new("Expected Point")));
+        }
+        Ok(has_proper_len)
     }
 
     #[wasm_bindgen(js_name = isPrivate)]
     #[allow(unused_variables)]
     pub fn is_private(&self, x: JsBuffer) -> bool {
-        true
+        unsafe { ffi::secp256k1_ec_seckey_verify(*self.secp.ctx(), x.as_c_ptr()) == 1 }
     }
     #[wasm_bindgen(js_name = pointAdd)]
     #[allow(unused_variables)]
@@ -80,8 +85,45 @@ impl TinySecp {
         p_a: JsBuffer,
         p_b: JsBuffer,
         compressed: Option<bool>,
-    ) -> Option<JsBuffer> {
-        Some(Box::new([0u8]))
+    ) -> Result<JsValue, JsValue> {
+        match PublicKey::from_slice(&p_a) {
+            Ok(a) => match PublicKey::from_slice(&p_b) {
+                Ok(b) => match a.combine(&b) {
+                    Ok(result) => {
+                        let is_compressed = match compressed {
+                            Some(val) => val,
+                            None => p_a.len() == 33,
+                        };
+                        if is_compressed {
+                            unsafe {
+                                let array = js_sys::Uint8Array::view(&mut result.serialize());
+                                return Ok(JsValue::from(array));
+                            }
+                        } else {
+                            unsafe {
+                                let array =
+                                    js_sys::Uint8Array::view(&mut result.serialize_uncompressed());
+                                return Ok(JsValue::from(array));
+                            }
+                        }
+                    }
+                    Err(_) => return Ok(JsValue::NULL),
+                },
+                Err(_) => return Err(JsValue::from(TypeError::new("Expected Point"))),
+            },
+            Err(_) => return Err(JsValue::from(TypeError::new("Expected Point"))),
+        }
+        // let mut puba = ffi::PublicKey::new();
+        // let mut pubb = ffi::PublicKey::new();
+        // let ptrs = [puba, pubb];
+        // if !is_point(*self.secp.ctx(), p_a, &mut puba) || is_point(*self.secp.ctx(), p_b, &mut pubb) {
+        //     return Err(JsValue::from(TypeError::new("Expected Point")));
+        // }
+        // let mut pubc = ffi::PublicKey::new();
+        // if ffi::secp256k1_ec_pubkey_combine(*self.secp.ctx(), &mut pubc, &ptrs.as_c_ptr(), 2) == 0 {
+        //     let result = PublicKey::from_slice(pubc.0).serialize();
+        //     return Ok(Box::new());
+        // }
     }
     #[wasm_bindgen(js_name = pointAddScalar)]
     #[allow(unused_variables)]
