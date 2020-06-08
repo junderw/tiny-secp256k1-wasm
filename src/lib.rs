@@ -1,34 +1,11 @@
-extern crate wasm_bindgen;
-extern crate wee_alloc;
-
-// use web_sys::console;
-//
-// pub struct Timer<'a> {
-//     name: &'a str,
-// }
-//
-// impl<'a> Timer<'a> {
-//     pub fn new(name: &'a str) -> Timer<'a> {
-//         console::time_with_label(name);
-//         Timer { name }
-//     }
-// }
-//
-// impl<'a> Timer<'a> {
-//     fn end(&mut self) {
-//         console::time_end_with_label(self.name);
-//     }
-// }
-
-// Use `wee_alloc` as the global allocator.
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 use js_sys::TypeError;
 use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
-pub use secp256k1_sys as ffi;
+use secp256k1_sys as ffi;
 use secp256k1_sys::CPtr;
 use wasm_bindgen::prelude::*;
+
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 // Dummy Node.js Buffer type
 // TODO: Replace appropriate type. It might be good to subdivide into `Point`, `Scaler`, etc.
