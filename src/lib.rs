@@ -86,44 +86,35 @@ impl TinySecp {
         p_b: JsBuffer,
         compressed: Option<bool>,
     ) -> Result<JsValue, JsValue> {
-        match PublicKey::from_slice(&p_a) {
-            Ok(a) => match PublicKey::from_slice(&p_b) {
-                Ok(b) => match a.combine(&b) {
-                    Ok(result) => {
-                        let is_compressed = match compressed {
-                            Some(val) => val,
-                            None => p_a.len() == 33,
-                        };
-                        if is_compressed {
-                            unsafe {
-                                let array = js_sys::Uint8Array::view(&mut result.serialize());
-                                return Ok(JsValue::from(array));
-                            }
-                        } else {
-                            unsafe {
-                                let array =
-                                    js_sys::Uint8Array::view(&mut result.serialize_uncompressed());
-                                return Ok(JsValue::from(array));
-                            }
-                        }
-                    }
-                    Err(_) => return Ok(JsValue::NULL),
-                },
-                Err(_) => return Err(JsValue::from(TypeError::new("Expected Point"))),
-            },
-            Err(_) => return Err(JsValue::from(TypeError::new("Expected Point"))),
+        let puba = PublicKey::from_slice(&p_a)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
+        let pubb = PublicKey::from_slice(&p_b)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
+
+        let key_option = match puba.combine(&pubb) {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        };
+
+        if key_option == None {
+            return Ok(JsValue::NULL);
         }
-        // let mut puba = ffi::PublicKey::new();
-        // let mut pubb = ffi::PublicKey::new();
-        // let ptrs = [puba, pubb];
-        // if !is_point(*self.secp.ctx(), p_a, &mut puba) || is_point(*self.secp.ctx(), p_b, &mut pubb) {
-        //     return Err(JsValue::from(TypeError::new("Expected Point")));
-        // }
-        // let mut pubc = ffi::PublicKey::new();
-        // if ffi::secp256k1_ec_pubkey_combine(*self.secp.ctx(), &mut pubc, &ptrs.as_c_ptr(), 2) == 0 {
-        //     let result = PublicKey::from_slice(pubc.0).serialize();
-        //     return Ok(Box::new());
-        // }
+
+        let result = key_option.unwrap();
+
+        let is_compressed = compressed.unwrap_or(p_a.len() == 33);
+
+        if is_compressed {
+            unsafe {
+                let array = js_sys::Uint8Array::view(&mut result.serialize());
+                return Ok(JsValue::from(array));
+            }
+        } else {
+            unsafe {
+                let array = js_sys::Uint8Array::view(&mut result.serialize_uncompressed());
+                return Ok(JsValue::from(array));
+            }
+        }
     }
     #[wasm_bindgen(js_name = pointAddScalar)]
     #[allow(unused_variables)]
