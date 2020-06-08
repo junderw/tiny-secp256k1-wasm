@@ -26,6 +26,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use js_sys::TypeError;
 use secp256k1::{Message, Secp256k1, SecretKey};
+pub use secp256k1_sys as ffi;
 use wasm_bindgen::prelude::*;
 
 // Dummy Node.js Buffer type
@@ -48,13 +49,23 @@ impl TinySecp {
     #[wasm_bindgen(js_name = isPoint)]
     #[allow(unused_variables)]
     pub fn is_point(&self, p: JsBuffer) -> bool {
-        true
+        if p.len() != 33 && p.len() != 65 {
+            return false;
+        }
+        unsafe {
+            ffi::secp256k1_ec_pubkey_parse(
+                ffi::secp256k1_context_no_precomp,
+                &mut ffi::PublicKey::new(),
+                p.as_ptr(),
+                p.len(),
+            ) != 0
+        }
     }
 
     #[wasm_bindgen(js_name = isPointCompressed)]
     #[allow(unused_variables)]
     pub fn is_point_compressed(&self, p: JsBuffer) -> bool {
-        true
+        p.len() == 33 && self.is_point(p)
     }
 
     #[wasm_bindgen(js_name = isPrivate)]
