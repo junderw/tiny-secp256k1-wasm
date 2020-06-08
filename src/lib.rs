@@ -48,6 +48,7 @@ pub struct TinySecp {
 
 #[wasm_bindgen]
 impl TinySecp {
+    #[wasm_bindgen(constructor)]
     pub fn new() -> TinySecp {
         TinySecp {
             secp: Secp256k1::new(),
