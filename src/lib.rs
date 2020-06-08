@@ -34,11 +34,18 @@ use wasm_bindgen::prelude::*;
 // TODO: Replace appropriate type. It might be good to subdivide into `Point`, `Scaler`, etc.
 type JsBuffer = Box<[u8]>;
 
-pub fn is_point(ctx_ptr: *const ffi::Context, p: JsBuffer, pubkey: &mut ffi::PublicKey) -> bool {
+pub fn is_point(ctx_ptr: *const ffi::Context, p: &JsBuffer, pubkey: &mut ffi::PublicKey) -> bool {
     if p.len() != 33 && p.len() != 65 {
         return false;
     }
     unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), p.len()) != 0 }
+}
+
+pub fn is_order_scalar(tweak: JsBuffer) -> bool {
+    if tweak.len() != 32 || &*tweak >= &secp256k1::constants::CURVE_ORDER || &*tweak == [0u8; 32] {
+        return false;
+    }
+    return true;
 }
 
 #[wasm_bindgen]
@@ -61,7 +68,7 @@ impl TinySecp {
         if p.len() != 33 && p.len() != 65 {
             return false;
         }
-        is_point(*self.secp.ctx(), p, &mut ffi::PublicKey::new())
+        is_point(*self.secp.ctx(), &p, &mut ffi::PublicKey::new())
     }
 
     #[wasm_bindgen(js_name = isPointCompressed)]
@@ -124,8 +131,43 @@ impl TinySecp {
         p: JsBuffer,
         tweak: JsBuffer,
         compressed: Option<bool>,
-    ) -> Option<JsBuffer> {
-        Some(Box::new([0u8]))
+    ) -> Result<JsValue, JsValue> {
+        let tweak_clone = tweak.clone();
+        if !is_order_scalar(tweak) {
+            return Err(JsValue::from(TypeError::new("Expected Tweak")));
+        }
+        let mut pubkey = ffi::PublicKey::new();
+        if !is_point(*self.secp.ctx(), &p, &mut pubkey) {
+            return Err(JsValue::from(TypeError::new("Expected Point")));
+        }
+
+        let mut puba = PublicKey::from_slice(&p)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
+
+        let key_option = match puba.add_exp_assign(&self.secp, &tweak_clone) {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        };
+
+        if key_option == None {
+            return Ok(JsValue::NULL);
+        }
+
+        let result = key_option.unwrap();
+
+        let is_compressed = compressed.unwrap_or(p.len() == 33);
+
+        if is_compressed {
+            unsafe {
+                let array = js_sys::Uint8Array::view(&mut puba.serialize());
+                return Ok(JsValue::from(array));
+            }
+        } else {
+            unsafe {
+                let array = js_sys::Uint8Array::view(&mut puba.serialize_uncompressed());
+                return Ok(JsValue::from(array));
+            }
+        }
     }
     #[wasm_bindgen(js_name = pointCompress)]
     #[allow(unused_variables)]
