@@ -171,8 +171,45 @@ impl TinySecp {
     }
     #[wasm_bindgen(js_name = pointCompress)]
     #[allow(unused_variables)]
-    pub fn point_compress(&self, p: JsBuffer, compressed: Option<bool>) -> JsBuffer {
-        Box::new([0u8])
+    pub fn point_compress(
+        &self,
+        p: JsBuffer,
+        compressed: Option<bool>,
+    ) -> Result<JsBuffer, JsValue> {
+        set_panic_hook();
+        let is_compressed = compressed.unwrap_or(p.len() == 33);
+        let mut pubkey = ffi::PublicKey::new();
+        if !is_point(*self.secp.ctx(), &p, &mut pubkey) {
+            return Err(JsValue::from(TypeError::new("Expected Point")));
+        }
+        let mut puba = PublicKey::from_slice(&p)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
+
+        if is_compressed {
+            let mut result = [0u8; 33];
+            unsafe {
+                let success = ffi::secp256k1_ec_pubkey_serialize(
+                    *self.secp.ctx(),
+                    result.as_mut_c_ptr(),
+                    &mut (33 as usize),
+                    puba.as_mut_c_ptr(),
+                    ffi::SECP256K1_SER_COMPRESSED,
+                );
+                Ok(Box::new(result))
+            }
+        } else {
+            let mut result = [0u8; 65];
+            unsafe {
+                let success = ffi::secp256k1_ec_pubkey_serialize(
+                    *self.secp.ctx(),
+                    result.as_mut_c_ptr(),
+                    &mut (65 as usize),
+                    puba.as_mut_c_ptr(),
+                    ffi::SECP256K1_SER_UNCOMPRESSED,
+                );
+                Ok(Box::new(result))
+            }
+        }
     }
     #[wasm_bindgen(js_name = pointFromScalar)]
     #[allow(unused_variables)]
