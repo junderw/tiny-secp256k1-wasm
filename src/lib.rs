@@ -142,45 +142,13 @@ impl TinySecp {
         compressed: Option<bool>,
     ) -> Result<JsBuffer, JsValue> {
         let is_compressed = compressed.unwrap_or(p.len() == 33);
-        let mut pubkey = ffi::PublicKey::new();
-        if !is_point(*self.secp.ctx(), &p, &mut pubkey) {
-            return Err(JsValue::from(TypeError::new("Expected Point")));
-        }
-        let mut puba = PublicKey::from_slice(&p)
+        let puba = PublicKey::from_slice(&p)
             .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
 
         if is_compressed {
-            let mut result = [0u8; 33];
-            unsafe {
-                let success = ffi::secp256k1_ec_pubkey_serialize(
-                    *self.secp.ctx(),
-                    result.as_mut_c_ptr(),
-                    &mut (33 as usize),
-                    puba.as_mut_c_ptr(),
-                    ffi::SECP256K1_SER_COMPRESSED,
-                );
-                if success == 0 {
-                    Err(JsValue::from(TypeError::new("Expected Point")))
-                } else {
-                    Ok(Box::new(result))
-                }
-            }
+            Ok(Box::new(puba.serialize()))
         } else {
-            let mut result = [0u8; 65];
-            unsafe {
-                let success = ffi::secp256k1_ec_pubkey_serialize(
-                    *self.secp.ctx(),
-                    result.as_mut_c_ptr(),
-                    &mut (65 as usize),
-                    puba.as_mut_c_ptr(),
-                    ffi::SECP256K1_SER_UNCOMPRESSED,
-                );
-                if success == 0 {
-                    Err(JsValue::from(TypeError::new("Expected Point")))
-                } else {
-                    Ok(Box::new(result))
-                }
-            }
+            Ok(Box::new(puba.serialize_uncompressed()))
         }
     }
     #[wasm_bindgen(js_name = pointFromScalar)]
