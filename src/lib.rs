@@ -273,15 +273,10 @@ impl TinySecp {
     }
     #[wasm_bindgen]
     pub fn sign(&self, hash: JsBuffer, x: JsBuffer) -> Result<JsBuffer, JsValue> {
-        // How do I check Buffer.isBuffer()?
-        if hash.len() != 32 {
-            return Err(JsValue::from(TypeError::new("Expected Hash")));
-        }
-        if x.len() != 32 {
-            return Err(JsValue::from(TypeError::new("Expected Private")));
-        }
-        let msg_hash = Message::from_slice(&hash).unwrap_throw();
-        let pk = SecretKey::from_slice(&x).unwrap_throw();
+        let msg_hash = Message::from_slice(&hash)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Hash")))?;
+        let pk = SecretKey::from_slice(&x)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
         Ok(Box::new(self.secp.sign(&msg_hash, &pk).serialize_compact()))
     }
     #[wasm_bindgen(js_name = signWithEntropy)]
@@ -291,15 +286,10 @@ impl TinySecp {
         x: JsBuffer,
         add_data: JsBuffer,
     ) -> Result<JsBuffer, JsValue> {
-        // How do I check Buffer.isBuffer()?
-        if hash.len() != 32 {
-            return Err(JsValue::from(TypeError::new("Expected Hash")));
-        }
-        if x.len() != 32 {
-            return Err(JsValue::from(TypeError::new("Expected Private")));
-        }
-        let msg = Message::from_slice(&hash).unwrap_throw();
-        let sk = SecretKey::from_slice(&x).unwrap_throw();
+        let msg = Message::from_slice(&hash)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Hash")))?;
+        let sk = SecretKey::from_slice(&x)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
 
         let mut ret = ffi::Signature::new();
         unsafe {
