@@ -45,9 +45,6 @@ async function performBench(func, fixture, typeName) {
   console.log(
     `Finished ${iter} iterations of       ${typeName} ${funcName}${notes} in ${diffTime} ms`,
   );
-  console.log(
-    '------------------------------------------------------------------',
-  );
   return diffTime;
 }
 
@@ -86,6 +83,9 @@ async function main(args) {
         'BITCOIN-TS WASM',
       );
     }
+    console.log(
+      '------------------------------------------------------------------',
+    );
     if (javaScT < rsWasmT) {
       console.log(
         '************ ^^^^^ OUR WASM IS SLOWER THAN JS ********************',
@@ -108,13 +108,6 @@ async function main(args) {
 }
 
 const FIXTURES = [
-  {
-    name: 'sign',
-    notes: '',
-    iterations: 1000,
-    args: [RANDOM_HASH, RANDOM_KEY],
-    bitcoinTSEquiv: secp256k1 => secp256k1.signMessageHashCompact,
-  },
   {
     name: 'isPoint',
     notes: '',
@@ -197,6 +190,20 @@ const FIXTURES = [
     notes: '',
     iterations: 10000,
     args: [RANDOM_KEY, RANDOM_KEY2],
+    bitcoinTSEquiv: null,
+  },
+  {
+    name: 'sign',
+    notes: '',
+    iterations: 1000,
+    args: [RANDOM_HASH, RANDOM_KEY],
+    bitcoinTSEquiv: secp256k1 => secp256k1.signMessageHashCompact,
+  },
+  {
+    name: 'signWithEntropy',
+    notes: '',
+    iterations: 1000,
+    args: [RANDOM_HASH, RANDOM_KEY, RANDOM_KEY2],
     bitcoinTSEquiv: null,
   },
 ];

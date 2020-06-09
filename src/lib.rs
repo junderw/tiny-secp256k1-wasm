@@ -18,13 +18,6 @@ pub fn is_point(ctx_ptr: *const ffi::Context, p: &JsBuffer, pubkey: &mut ffi::Pu
     unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), p.len()) != 0 }
 }
 
-pub fn is_order_scalar(tweak: JsBuffer) -> bool {
-    if tweak.len() != 32 || &*tweak >= &secp256k1::constants::CURVE_ORDER || &*tweak == [0u8; 32] {
-        return false;
-    }
-    return true;
-}
-
 #[wasm_bindgen]
 pub struct TinySecp {
     secp: Secp256k1<secp256k1::All>,
@@ -108,7 +101,7 @@ impl TinySecp {
         compressed: Option<bool>,
     ) -> Result<JsValue, JsValue> {
         let tweak_clone = tweak.clone();
-        if !is_order_scalar(tweak) {
+        if !self.is_private(tweak) {
             return Err(JsValue::from(TypeError::new("Expected Tweak")));
         }
         let mut pubkey = ffi::PublicKey::new();
@@ -208,7 +201,6 @@ impl TinySecp {
         }
     }
     #[wasm_bindgen(js_name = pointMultiply)]
-    #[allow(unused_variables)]
     pub fn point_multiply(
         &self,
         p: JsBuffer,
@@ -218,7 +210,7 @@ impl TinySecp {
         let is_compressed = compressed.unwrap_or(p.len() == 33);
         let mut pubkey = PublicKey::from_slice(&p)
             .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
-        let sk = SecretKey::from_slice(&tweak)
+        SecretKey::from_slice(&tweak)
             .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
 
         let newpubkey = match pubkey.mul_assign(&self.secp, &tweak) {
@@ -242,7 +234,6 @@ impl TinySecp {
         }
     }
     #[wasm_bindgen(js_name = privateAdd)]
-    #[allow(unused_variables)]
     pub fn private_add(&self, d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
         let mut sk1 = SecretKey::from_slice(&d)
             .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
@@ -260,7 +251,6 @@ impl TinySecp {
         }
     }
     #[wasm_bindgen(js_name = privateSub)]
-    #[allow(unused_variables)]
     pub fn private_sub(&self, d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
         let mut sk1 = SecretKey::from_slice(&d)
             .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
@@ -297,9 +287,43 @@ impl TinySecp {
         Ok(Box::new(self.secp.sign(&msg_hash, &pk).serialize_compact()))
     }
     #[wasm_bindgen(js_name = signWithEntropy)]
-    #[allow(unused_variables)]
-    pub fn sign_with_entropy(&self, hash: JsBuffer, x: JsBuffer, add_data: JsValue) -> JsBuffer {
-        Box::new([0u8])
+    pub fn sign_with_entropy(
+        &self,
+        hash: JsBuffer,
+        x: JsBuffer,
+        add_data: JsBuffer,
+    ) -> Result<JsBuffer, JsValue> {
+        set_panic_hook();
+        // How do I check Buffer.isBuffer()?
+        if hash.len() != 32 {
+            return Err(JsValue::from(TypeError::new("Expected Hash")));
+        }
+        if x.len() != 32 {
+            return Err(JsValue::from(TypeError::new("Expected Private")));
+        }
+        let msg = Message::from_slice(&hash).unwrap_throw();
+        let sk = SecretKey::from_slice(&x).unwrap_throw();
+
+        let mut ret = ffi::Signature::new();
+        unsafe {
+            // We can assume the return value because it's not possible to construct
+            // an invalid signature from a valid `Message` and `SecretKey`
+            assert_eq!(
+                ffi::secp256k1_ecdsa_sign(
+                    *self.secp.ctx(),
+                    &mut ret,
+                    msg.as_c_ptr(),
+                    sk.as_c_ptr(),
+                    ffi::secp256k1_nonce_function_rfc6979,
+                    add_data.as_c_ptr() as *const ffi::types::c_void
+                ),
+                1
+            );
+        }
+
+        Ok(Box::new(
+            secp256k1::Signature::from(ret).serialize_compact(),
+        ))
     }
     #[wasm_bindgen]
     #[allow(unused_variables)]
