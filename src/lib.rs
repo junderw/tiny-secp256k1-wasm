@@ -276,6 +276,12 @@ impl TinySecp {
         if add_data == None {
             return Ok(Box::new(self.secp.sign(&msg, &sk).serialize_compact()));
         }
+        let extra_bytes = add_data.unwrap();
+        if extra_bytes.len() != 32 {
+            return Err(JsValue::from(TypeError::new(
+                "Expected Extra Data (32 bytes)",
+            )));
+        }
         let mut ret = ffi::Signature::new();
         unsafe {
             // We can assume the return value because it's not possible to construct
@@ -287,7 +293,7 @@ impl TinySecp {
                     msg.as_c_ptr(),
                     sk.as_c_ptr(),
                     ffi::secp256k1_nonce_function_rfc6979,
-                    add_data.unwrap().as_c_ptr() as *const ffi::types::c_void
+                    extra_bytes.as_c_ptr() as *const ffi::types::c_void
                 ),
                 1
             );
