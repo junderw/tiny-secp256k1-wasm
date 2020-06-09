@@ -40,7 +40,6 @@ impl TinySecp {
     }
 
     #[wasm_bindgen(js_name = isPoint)]
-    #[allow(unused_variables)]
     pub fn is_point(&self, p: JsBuffer) -> bool {
         if p.len() != 33 && p.len() != 65 {
             return false;
@@ -49,7 +48,6 @@ impl TinySecp {
     }
 
     #[wasm_bindgen(js_name = isPointCompressed)]
-    #[allow(unused_variables)]
     pub fn is_point_compressed(&self, p: JsBuffer) -> Result<bool, JsValue> {
         let has_proper_len = p.len() == 33;
         if !has_proper_len {
@@ -62,12 +60,10 @@ impl TinySecp {
     }
 
     #[wasm_bindgen(js_name = isPrivate)]
-    #[allow(unused_variables)]
     pub fn is_private(&self, x: JsBuffer) -> bool {
         unsafe { ffi::secp256k1_ec_seckey_verify(*self.secp.ctx(), x.as_c_ptr()) == 1 }
     }
     #[wasm_bindgen(js_name = pointAdd)]
-    #[allow(unused_variables)]
     pub fn point_add(
         &self,
         p_a: JsBuffer,
@@ -105,7 +101,6 @@ impl TinySecp {
         }
     }
     #[wasm_bindgen(js_name = pointAddScalar)]
-    #[allow(unused_variables)]
     pub fn point_add_scalar(
         &self,
         p: JsBuffer,
@@ -133,8 +128,6 @@ impl TinySecp {
             return Ok(JsValue::NULL);
         }
 
-        let result = key_option.unwrap();
-
         let is_compressed = compressed.unwrap_or(p.len() == 33);
 
         if is_compressed {
@@ -150,7 +143,6 @@ impl TinySecp {
         }
     }
     #[wasm_bindgen(js_name = pointCompress)]
-    #[allow(unused_variables)]
     pub fn point_compress(
         &self,
         p: JsBuffer,
@@ -175,7 +167,11 @@ impl TinySecp {
                     puba.as_mut_c_ptr(),
                     ffi::SECP256K1_SER_COMPRESSED,
                 );
-                Ok(Box::new(result))
+                if success == 0 {
+                    Err(JsValue::from(TypeError::new("Expected Point")))
+                } else {
+                    Ok(Box::new(result))
+                }
             }
         } else {
             let mut result = [0u8; 65];
@@ -187,12 +183,15 @@ impl TinySecp {
                     puba.as_mut_c_ptr(),
                     ffi::SECP256K1_SER_UNCOMPRESSED,
                 );
-                Ok(Box::new(result))
+                if success == 0 {
+                    Err(JsValue::from(TypeError::new("Expected Point")))
+                } else {
+                    Ok(Box::new(result))
+                }
             }
         }
     }
     #[wasm_bindgen(js_name = pointFromScalar)]
-    #[allow(unused_variables)]
     pub fn point_from_scalar(
         &self,
         d: JsBuffer,
