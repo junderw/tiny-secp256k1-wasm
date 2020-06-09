@@ -5,51 +5,173 @@ const bitcoinTS = require('bitcoin-ts');
 const { instantiateSecp256k1 } = bitcoinTS;
 const crypto = require('crypto');
 
+const readline = require('readline');
+const cursorTo = x =>
+  new Promise(r => {
+    process.stdout.clearLine();
+    readline.cursorTo(process.stdout, x, undefined, () => {
+      r();
+    });
+  });
+
 const RANDOM_KEY = crypto.randomBytes(32);
 RANDOM_KEY[0] &= 0x7f;
 RANDOM_KEY[31] = 0xff; // (lazy) make sure it's not invalid
+const RANDOM_KEY2 = crypto.randomBytes(32);
+RANDOM_KEY2[0] &= 0x7f;
+RANDOM_KEY2[31] = 0xff;
 
 const RANDOM_HASH = crypto.randomBytes(32);
 
 const PUBKEY_C = eccNative.pointFromScalar(RANDOM_KEY, true);
 const PUBKEY_UC = eccNative.pointCompress(PUBKEY_C, false);
+const PUBKEY_C2 = eccNative.pointFromScalar(RANDOM_KEY2, true);
+const PUBKEY_UC2 = eccNative.pointCompress(PUBKEY_C2, false);
 
-async function performBench(func, args, typeName, funcName, iter) {
-  console.log(`Starting ${iter} iteration bench for ${typeName} ${funcName}`);
+async function performBench(func, fixture, typeName) {
+  const { name: funcName, iterations: iter, args, notes } = fixture;
+  process.stdout.write(
+    `Starting ${iter} iteration bench for ${typeName} ${funcName}${notes}`,
+  );
   const before = Date.now();
-  for(let i = 0; i < iter; i++) {
-    func(...args)
+  for (let i = 0; i < iter; i++) {
+    func(...args);
   }
   const after = Date.now();
-  console.log(`Finished ${iter} iterations of       ${typeName} ${funcName} in ${after - before} ms`);
-  console.log('------------------------------------------------------------------');
+  const diffTime = after - before;
+  await cursorTo(0);
+  console.log(
+    `Finished ${iter} iterations of       ${typeName} ${funcName}${notes} in ${diffTime} ms`,
+  );
+  console.log(
+    '------------------------------------------------------------------',
+  );
+  return diffTime;
 }
 
 async function main(args) {
   const secp256k1 = await instantiateSecp256k1();
   const secp = new pkg.TinySecp();
-  console.log('------------------------------------------------------------------');
+  const slowerNames = [];
+  console.log(
+    '------------------------------------------------------------------',
+  );
   for (const fixture of FIXTURES) {
-    await performBench(eccNative[fixture.name], fixture.args, 'NATIVE         ', fixture.name, fixture.iterations);
-    await performBench(ecc[fixture.name], fixture.args, 'JS             ', fixture.name, fixture.iterations);
-    await performBench(fixture.bitcoinTSEquiv(secp256k1), fixture.args, 'BITCOIN-TS WASM', fixture.name, fixture.iterations);
-    await performBench(secp[fixture.name].bind(secp), fixture.args, 'OUR-WASM       ', fixture.name, fixture.iterations);
+    console.log(`     Fixture: ${fixture.name}`);
+    console.log(
+      '------------------------------------------------------------------',
+    );
+    const nativeT = await performBench(
+      eccNative[fixture.name],
+      fixture,
+      'NATIVE         ',
+    );
+    const javaScT = await performBench(
+      ecc[fixture.name],
+      fixture,
+      'JS             ',
+    );
+    const rsWasmT = await performBench(
+      secp[fixture.name].bind(secp),
+      fixture,
+      'OUR-WASM       ',
+    );
+    let bitcTST;
+    if (fixture.bitcoinTSEquiv) {
+      bitcTST = await performBench(
+        fixture.bitcoinTSEquiv(secp256k1),
+        fixture,
+        'BITCOIN-TS WASM',
+      );
+    }
+    if (javaScT < rsWasmT) {
+      console.log(
+        '************ ^^^^^ OUR WASM IS SLOWER THAN JS ********************',
+      );
+      console.log(
+        '------------------------------------------------------------------',
+      );
+      slowerNames.push(`- ${fixture.name}${fixture.notes}`);
+    }
+  }
+  if (slowerNames.length > 0) {
+    console.log(
+      '************ vvvvv OUR WASM IS SLOWER THAN JS ********************',
+    );
+    console.log(
+      '------------------------------------------------------------------',
+    );
+    console.log(slowerNames.join('\n'));
   }
 }
 
 const FIXTURES = [
   {
     name: 'sign',
+    notes: '',
     iterations: 1000,
-    args: [
-      RANDOM_HASH,
-      RANDOM_KEY,
-    ],
+    args: [RANDOM_HASH, RANDOM_KEY],
     bitcoinTSEquiv: secp256k1 => secp256k1.signMessageHashCompact,
+  },
+  {
+    name: 'isPoint',
+    notes: '',
+    iterations: 10000,
+    args: [PUBKEY_C],
+    bitcoinTSEquiv: null, // has none
+  },
+  {
+    name: 'isPointCompressed',
+    notes: '',
+    iterations: 10000,
+    args: [PUBKEY_C],
+    bitcoinTSEquiv: null,
+  },
+  {
+    name: 'isPoint',
+    notes: ' with uncompressed pubkey',
+    iterations: 1000000,
+    args: [PUBKEY_UC],
+    bitcoinTSEquiv: null,
+  },
+  {
+    name: 'isPointCompressed',
+    notes: ' with uncompressed pubkey',
+    iterations: 1000000,
+    args: [PUBKEY_UC],
+    bitcoinTSEquiv: null,
+  },
+  {
+    name: 'isPrivate',
+    notes: '',
+    iterations: 1000000,
+    args: [RANDOM_KEY],
+    bitcoinTSEquiv: secp256k1 => secp256k1.validatePrivateKey,
+  },
+  {
+    name: 'pointAdd',
+    notes: '',
+    iterations: 100,
+    args: [PUBKEY_C, PUBKEY_C2, true],
+    bitcoinTSEquiv: null,
+  },
+  {
+    name: 'pointAddScalar',
+    notes: '',
+    iterations: 100,
+    args: [PUBKEY_C, RANDOM_KEY2, true],
+    bitcoinTSEquiv: secp256k1 => secp256k1.addTweakPublicKeyCompressed,
+  },
+  {
+    name: 'pointCompress',
+    notes: '',
+    iterations: 10000,
+    args: [PUBKEY_UC, true],
+    bitcoinTSEquiv: secp256k1 => secp256k1.compressPublicKey,
   },
 ];
 
 main(process.argv.slice(2)).catch(err => {
-  console.error(err)
-  process.exit(err.code || 1)
-})
+  console.error(err);
+  process.exit(err.code || 1);
+});
