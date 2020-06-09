@@ -52,6 +52,9 @@ impl TinySecp {
     #[allow(unused_variables)]
     pub fn is_point_compressed(&self, p: JsBuffer) -> Result<bool, JsValue> {
         let has_proper_len = p.len() == 33;
+        if !has_proper_len {
+            return Ok(false);
+        }
         if !self.is_point(p) {
             return Err(JsValue::from(TypeError::new("Expected Point")));
         }
