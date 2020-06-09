@@ -18,6 +18,14 @@ pub fn is_point(ctx_ptr: *const ffi::Context, p: &JsBuffer, pubkey: &mut ffi::Pu
     unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), p.len()) != 0 }
 }
 
+pub fn is_private(ctx: *const secp256k1_sys::Context, x: *const u8) -> bool {
+    unsafe { ffi::secp256k1_ec_seckey_verify(ctx, x) == 1 }
+}
+
+pub fn is_tweak(ctx: *const secp256k1_sys::Context, tweak: &JsBuffer) -> bool {
+    *tweak == Box::new([0u8; 32]) || is_private(ctx, tweak.as_c_ptr())
+}
+
 #[wasm_bindgen]
 pub struct TinySecp {
     secp: Secp256k1<secp256k1::All>,
@@ -54,7 +62,7 @@ impl TinySecp {
 
     #[wasm_bindgen(js_name = isPrivate)]
     pub fn is_private(&self, x: JsBuffer) -> bool {
-        unsafe { ffi::secp256k1_ec_seckey_verify(*self.secp.ctx(), x.as_c_ptr()) == 1 }
+        is_private(*self.secp.ctx(), x.as_c_ptr())
     }
     #[wasm_bindgen(js_name = pointAdd)]
     pub fn point_add(
@@ -100,8 +108,7 @@ impl TinySecp {
         tweak: JsBuffer,
         compressed: Option<bool>,
     ) -> Result<JsValue, JsValue> {
-        let tweak_clone = tweak.clone();
-        if !self.is_private(tweak) {
+        if !is_tweak(*self.secp.ctx(), &tweak) {
             return Err(JsValue::from(TypeError::new("Expected Tweak")));
         }
         let mut pubkey = ffi::PublicKey::new();
@@ -112,7 +119,7 @@ impl TinySecp {
         let mut puba = PublicKey::from_slice(&p)
             .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
 
-        let key_option = match puba.add_exp_assign(&self.secp, &tweak_clone) {
+        let key_option = match puba.add_exp_assign(&self.secp, &tweak) {
             Ok(a) => Some(a),
             Err(_) => None,
         };
@@ -177,8 +184,9 @@ impl TinySecp {
         let is_compressed = compressed.unwrap_or(p.len() == 33);
         let mut pubkey = PublicKey::from_slice(&p)
             .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
-        SecretKey::from_slice(&tweak)
-            .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
+        if !is_tweak(*self.secp.ctx(), &tweak) {
+            return Err(JsValue::from(TypeError::new("Expected Tweak")));
+        }
 
         let newpubkey = match pubkey.mul_assign(&self.secp, &tweak) {
             Ok(a) => Some(a),
@@ -204,6 +212,9 @@ impl TinySecp {
     pub fn private_add(&self, d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
         let mut sk1 = SecretKey::from_slice(&d)
             .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
+        if !is_tweak(*self.secp.ctx(), &tweak) {
+            return Err(JsValue::from(TypeError::new("Expected Tweak")));
+        }
 
         let result = match sk1.add_assign(&tweak) {
             Ok(a) => Some(a),
@@ -221,6 +232,9 @@ impl TinySecp {
     pub fn private_sub(&self, d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
         let mut sk1 = SecretKey::from_slice(&d)
             .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
+        if !is_tweak(*self.secp.ctx(), &tweak) {
+            return Err(JsValue::from(TypeError::new("Expected Tweak")));
+        }
         let mut tweak_clone = tweak.clone();
 
         unsafe {
