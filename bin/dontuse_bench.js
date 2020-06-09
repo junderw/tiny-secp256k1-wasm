@@ -57,7 +57,7 @@ async function main(args) {
     '------------------------------------------------------------------',
   );
   for (const fixture of FIXTURES) {
-    console.log(`     Fixture: ${fixture.name}`);
+    console.log(`     Fixture: ${fixture.name}${fixture.notes}`);
     console.log(
       '------------------------------------------------------------------',
     );
@@ -168,6 +168,13 @@ const FIXTURES = [
     iterations: 10000,
     args: [PUBKEY_UC, true],
     bitcoinTSEquiv: secp256k1 => secp256k1.compressPublicKey,
+  },
+  {
+    name: 'pointFromScalar',
+    notes: '',
+    iterations: 1000,
+    args: [RANDOM_KEY, true],
+    bitcoinTSEquiv: secp256k1 => secp256k1.derivePublicKeyCompressed,
   },
 ];
 

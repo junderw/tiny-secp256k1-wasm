@@ -193,8 +193,20 @@ impl TinySecp {
     }
     #[wasm_bindgen(js_name = pointFromScalar)]
     #[allow(unused_variables)]
-    pub fn point_from_scalar(&self, d: JsBuffer, compressed: Option<bool>) -> Option<JsBuffer> {
-        Some(Box::new([0u8]))
+    pub fn point_from_scalar(
+        &self,
+        d: JsBuffer,
+        compressed: Option<bool>,
+    ) -> Result<JsBuffer, JsValue> {
+        let is_compressed = compressed.unwrap_or(true);
+        let sk = SecretKey::from_slice(&d)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
+        let pk = PublicKey::from_secret_key(&self.secp, &sk);
+        if is_compressed {
+            Ok(Box::new(pk.serialize()))
+        } else {
+            Ok(Box::new(pk.serialize_uncompressed()))
+        }
     }
     #[wasm_bindgen(js_name = pointMultiply)]
     #[allow(unused_variables)]
