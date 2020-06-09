@@ -214,8 +214,32 @@ impl TinySecp {
         p: JsBuffer,
         tweak: JsBuffer,
         compressed: Option<bool>,
-    ) -> Option<JsBuffer> {
-        Some(Box::new([0u8]))
+    ) -> Result<JsValue, JsValue> {
+        let is_compressed = compressed.unwrap_or(p.len() == 33);
+        let mut pubkey = PublicKey::from_slice(&p)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
+        let sk = SecretKey::from_slice(&tweak)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
+
+        let newpubkey = match pubkey.mul_assign(&self.secp, &tweak) {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        };
+        if newpubkey == None {
+            return Ok(JsValue::NULL);
+        }
+
+        if is_compressed {
+            unsafe {
+                let array = js_sys::Uint8Array::view(&mut pubkey.serialize());
+                return Ok(JsValue::from(array));
+            }
+        } else {
+            unsafe {
+                let array = js_sys::Uint8Array::view(&mut pubkey.serialize_uncompressed());
+                return Ok(JsValue::from(array));
+            }
+        }
     }
     #[wasm_bindgen(js_name = privateAdd)]
     #[allow(unused_variables)]

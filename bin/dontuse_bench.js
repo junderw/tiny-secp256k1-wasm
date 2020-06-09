@@ -176,6 +176,13 @@ const FIXTURES = [
     args: [RANDOM_KEY, true],
     bitcoinTSEquiv: secp256k1 => secp256k1.derivePublicKeyCompressed,
   },
+  {
+    name: 'pointMultiply',
+    notes: '',
+    iterations: 1000,
+    args: [PUBKEY_C, RANDOM_KEY, true],
+    bitcoinTSEquiv: secp256k1 => secp256k1.mulTweakPublicKeyCompressed,
+  },
 ];
 
 main(process.argv.slice(2)).catch(err => {
