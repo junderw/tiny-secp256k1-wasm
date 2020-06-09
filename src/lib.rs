@@ -284,13 +284,16 @@ impl TinySecp {
         &self,
         hash: JsBuffer,
         x: JsBuffer,
-        add_data: JsBuffer,
+        add_data: Option<JsBuffer>,
     ) -> Result<JsBuffer, JsValue> {
         let msg = Message::from_slice(&hash)
             .map_err(|_| JsValue::from(TypeError::new("Expected Hash")))?;
         let sk = SecretKey::from_slice(&x)
             .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
 
+        if add_data == None {
+            return Ok(Box::new(self.secp.sign(&msg, &sk).serialize_compact()));
+        }
         let mut ret = ffi::Signature::new();
         unsafe {
             // We can assume the return value because it's not possible to construct
@@ -302,7 +305,7 @@ impl TinySecp {
                     msg.as_c_ptr(),
                     sk.as_c_ptr(),
                     ffi::secp256k1_nonce_function_rfc6979,
-                    add_data.as_c_ptr() as *const ffi::types::c_void
+                    add_data.unwrap().as_c_ptr() as *const ffi::types::c_void
                 ),
                 1
             );
