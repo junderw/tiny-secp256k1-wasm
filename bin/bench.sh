@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # Build wasm-pack using clang-9
 cd "$DIR/.."
-CC=clang-9 wasm-pack build --release -t nodejs
+wasm-pack build --release -t nodejs
 
 # Install dependencies
 mkdir -p "$DIR/../tmp"
