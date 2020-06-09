@@ -16,8 +16,8 @@ default = ["console_error_panic_hook", "wee_alloc"]
 wasm-bindgen = "0.2.63"
 console_error_panic_hook = { version = "0.1.1", optional = true }
 wee_alloc = { version = "0.4.2", optional = true }
-secp256k1 = { git = "https://github.com/rust-bitcoin/rust-secp256k1", features = ["rand"] }
-secp256k1-sys = { git = "https://github.com/rust-bitcoin/rust-secp256k1" }
+secp256k1 = { git = "https://github.com/junderw/rust-secp256k1", features = ["rand"] }
+secp256k1-sys = { git = "https://github.com/junderw/rust-secp256k1" }
 rand = { version = "0.6", features = ["wasm-bindgen"] }
 js-sys = "0.3.40"
 

@@ -243,13 +243,44 @@ impl TinySecp {
     }
     #[wasm_bindgen(js_name = privateAdd)]
     #[allow(unused_variables)]
-    pub fn private_add(&self, d: JsBuffer, tweak: JsBuffer) -> Option<JsBuffer> {
-        Some(Box::new([0u8]))
+    pub fn private_add(&self, d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
+        let mut sk1 = SecretKey::from_slice(&d)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
+
+        let result = match sk1.add_assign(&tweak) {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        };
+        if result == None {
+            return Ok(JsValue::NULL);
+        }
+        unsafe {
+            let array = js_sys::Uint8Array::view(&sk1[..]);
+            return Ok(JsValue::from(array));
+        }
     }
     #[wasm_bindgen(js_name = privateSub)]
     #[allow(unused_variables)]
-    pub fn private_sub(&self, d: JsBuffer, tweak: JsBuffer) -> Option<JsBuffer> {
-        Some(Box::new([0u8]))
+    pub fn private_sub(&self, d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
+        let mut sk1 = SecretKey::from_slice(&d)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
+        let mut tweak_clone = tweak.clone();
+
+        unsafe {
+            ffi::secp256k1_ec_privkey_negate(*self.secp.ctx(), tweak_clone.as_mut_c_ptr());
+        }
+
+        let result = match sk1.add_assign(&tweak_clone) {
+            Ok(a) => Some(a),
+            Err(_) => None,
+        };
+        if result == None {
+            return Ok(JsValue::NULL);
+        }
+        unsafe {
+            let array = js_sys::Uint8Array::view(&sk1[..]);
+            return Ok(JsValue::from(array));
+        }
     }
     #[wasm_bindgen]
     pub fn sign(&self, hash: JsBuffer, x: JsBuffer) -> Result<JsBuffer, JsValue> {

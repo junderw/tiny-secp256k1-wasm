@@ -18,7 +18,9 @@ const RANDOM_KEY = crypto.randomBytes(32);
 RANDOM_KEY[0] &= 0x7f;
 RANDOM_KEY[31] = 0xff; // (lazy) make sure it's not invalid
 const RANDOM_KEY2 = crypto.randomBytes(32);
-RANDOM_KEY2[0] &= 0x7f;
+RANDOM_KEY2[0] = 0x00;
+RANDOM_KEY2[1] = 0x00;
+RANDOM_KEY2[2] = 0x00; // make it smaller than 1
 RANDOM_KEY2[31] = 0xff;
 
 const RANDOM_HASH = crypto.randomBytes(32);
@@ -182,6 +184,20 @@ const FIXTURES = [
     iterations: 1000,
     args: [PUBKEY_C, RANDOM_KEY, true],
     bitcoinTSEquiv: secp256k1 => secp256k1.mulTweakPublicKeyCompressed,
+  },
+  {
+    name: 'privateAdd',
+    notes: '',
+    iterations: 10000,
+    args: [RANDOM_KEY, RANDOM_KEY2],
+    bitcoinTSEquiv: secp256k1 => secp256k1.addTweakPrivateKey,
+  },
+  {
+    name: 'privateSub',
+    notes: '',
+    iterations: 10000,
+    args: [RANDOM_KEY, RANDOM_KEY2],
+    bitcoinTSEquiv: null,
   },
 ];
 
