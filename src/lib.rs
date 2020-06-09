@@ -1,5 +1,5 @@
 use js_sys::TypeError;
-use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+use secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use secp256k1_sys as ffi;
 use secp256k1_sys::CPtr;
 use wasm_bindgen::prelude::*;
@@ -141,7 +141,6 @@ impl TinySecp {
         p: JsBuffer,
         compressed: Option<bool>,
     ) -> Result<JsBuffer, JsValue> {
-        set_panic_hook();
         let is_compressed = compressed.unwrap_or(p.len() == 33);
         let mut pubkey = ffi::PublicKey::new();
         if !is_point(*self.secp.ctx(), &p, &mut pubkey) {
@@ -274,7 +273,6 @@ impl TinySecp {
     }
     #[wasm_bindgen]
     pub fn sign(&self, hash: JsBuffer, x: JsBuffer) -> Result<JsBuffer, JsValue> {
-        set_panic_hook();
         // How do I check Buffer.isBuffer()?
         if hash.len() != 32 {
             return Err(JsValue::from(TypeError::new("Expected Hash")));
@@ -293,7 +291,6 @@ impl TinySecp {
         x: JsBuffer,
         add_data: JsBuffer,
     ) -> Result<JsBuffer, JsValue> {
-        set_panic_hook();
         // How do I check Buffer.isBuffer()?
         if hash.len() != 32 {
             return Err(JsValue::from(TypeError::new("Expected Hash")));
@@ -326,20 +323,32 @@ impl TinySecp {
         ))
     }
     #[wasm_bindgen]
-    #[allow(unused_variables)]
     pub fn verify(
         &self,
         hash: JsBuffer,
         q: JsBuffer,
-        signature: JsValue,
-        compressed: Option<bool>,
-    ) -> bool {
-        // strict flag is not found in js impl (See #5)
-        true
+        signature: JsBuffer,
+        strict: Option<bool>,
+    ) -> Result<bool, JsValue> {
+        let is_strict = strict.unwrap_or(false);
+        let pubkey = PublicKey::from_slice(&q)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
+        let msg = Message::from_slice(&hash)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Hash")))?;
+        let mut sig = Signature::from_compact(&signature)
+            .map_err(|_| JsValue::from(TypeError::new("Expected Signature")))?;
+        if !is_strict {
+            sig.normalize_s();
+        }
+        match self.secp.verify(&msg, &sig, &pubkey) {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false),
+        }
     }
 }
 
-fn set_panic_hook() {
+#[wasm_bindgen(start)]
+pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 }

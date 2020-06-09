@@ -30,6 +30,8 @@ const PUBKEY_UC = eccNative.pointCompress(PUBKEY_C, false);
 const PUBKEY_C2 = eccNative.pointFromScalar(RANDOM_KEY2, true);
 const PUBKEY_UC2 = eccNative.pointCompress(PUBKEY_C2, false);
 
+const SIG = eccNative.sign(RANDOM_HASH, RANDOM_KEY);
+
 async function performBench(func, fixture, typeName) {
   const { name: funcName, iterations: iter, args, notes } = fixture;
   process.stdout.write(
@@ -205,6 +207,16 @@ const FIXTURES = [
     iterations: 1000,
     args: [RANDOM_HASH, RANDOM_KEY, RANDOM_KEY2],
     bitcoinTSEquiv: null,
+  },
+  {
+    name: 'verify',
+    notes: '',
+    iterations: 1000,
+    args: [RANDOM_HASH, PUBKEY_C, SIG],
+    bitcoinTSEquiv: secp256k1 => (hash, pub, sig, strict) => {
+      if (strict) return secp256k1.verifySignatureCompactLowS(sig, pub, hash);
+      else return secp256k1.verifySignatureCompact(sig, pub, hash);
+    },
   },
 ];
 
