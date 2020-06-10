@@ -5,7 +5,9 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # Build wasm-pack using clang-9
 cd "$DIR/.."
-wasm-pack build --release -t nodejs
+if [ ! -f pkg/wrapper.js ]; then
+  npm run build
+fi
 
 # Install dependencies
 mkdir -p "$DIR/../tmp"

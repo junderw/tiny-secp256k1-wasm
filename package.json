@@ -8,6 +8,7 @@
     "pkg"
   ],
   "scripts": {
+    "bench": "./bin/bench.sh",
     "build": "./bin/build.sh",
     "unit": "tape tests/index.js | tap-difflet -p",
     "test": "npm run unit"

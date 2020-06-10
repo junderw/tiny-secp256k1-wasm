@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 cd "$DIR"/..
 
-REL_WASM_PATH="./target/wasm32-unknown-unknown/release/tiny_secp256k1_wasm.wasm"
+REL_WASM_PATH="./pkg/tiny_secp256k1_wasm_bg.wasm"
 
 IMAGE_TO_RUN="${1:-junderw/tiny-secp256k1-wasm-builder}"
 
@@ -44,6 +44,5 @@ docker run \
   \
   chown -R $UID:$UID pkg/ && \
   chown -R $UID:$UID target/ && \
-  rsync -av pkg/ /data/pkg/ >/dev/null 2>&1 && \
-  rsync -av target/ /data/target/ >/dev/null 2>&1 \
+  rsync -av pkg/ /data/pkg/ >/dev/null 2>&1 \
   "
