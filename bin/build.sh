@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
 
+REL_WASM_PATH="./pkg/tiny_secp256k1_wasm_bg.wasm"
+IMAGE_TO_RUN="${1:-junderw/tiny-secp256k1-wasm-builder}"
+
 # Get directory of this file
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-
 cd "$DIR"/..
-
-REL_WASM_PATH="./pkg/tiny_secp256k1_wasm_bg.wasm"
-
-IMAGE_TO_RUN="${1:-junderw/tiny-secp256k1-wasm-builder}"
 
 docker run \
   -v "$(pwd)":/data \
+    `# This volume is for caching builds` \
+  -v tiny-secp256k1-wasm-vol:/datacopy \
   --rm \
   $IMAGE_TO_RUN \
   bash -c \
   "\
-  mkdir /datacopy && \
-  \
   \`# Copy over all the data in the repo \`\
   \
   rsync -av \
-    --exclude=.git/ --exclude=target/ --exclude=node_modules/ \
+    --delete --exclude=.git/ --exclude=target/ --exclude=node_modules/ \
     --exclude=tmp/ --exclude=pkg/ \
       /data/ /datacopy/ >/dev/null 2>&1 && \
   cd /datacopy && \
@@ -31,8 +29,7 @@ docker run \
   \
   \`# Insert the wrapper and point package.json to the wrapper \`\
   \
-  cp bin/wrapper.js pkg/wrapper.js && \
-  cp bin/wrapper.d.ts pkg/wrapper.d.ts && \
+  cp bin/tiny_secp256k1_wasm.d.ts pkg/tiny_secp256k1_wasm.d.ts && \
   rm pkg/package.json pkg/LICENSE pkg/README.md pkg/.gitignore && \
   \
   \`# Shrink the wasm binary \`\

@@ -4,7 +4,7 @@ const fpoints = require('./fixtures/points.json')
 function test (binding) {
   tape('isPoint', (t) => {
     fpoints.valid.isPoint.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
 
       t.equal(binding.isPoint(p), f.expected, `${f.P} is ${f.expected ? 'OK' : 'rejected'}`)
     })
@@ -15,7 +15,7 @@ function test (binding) {
   tape('isPointCompressed', (t) => {
     fpoints.valid.isPoint.forEach((f) => {
       if (!f.expected) return
-      const p = Buffer.from(f.P, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
       const e = p.length === 33
 
       t.equal(binding.isPointCompressed(p), e, `${f.P} is ${e ? 'compressed' : 'uncompressed'}`)
@@ -26,10 +26,10 @@ function test (binding) {
 
   tape('pointAdd', (t) => {
     fpoints.valid.pointAdd.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
-      const q = Buffer.from(f.Q, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
+      const q = Uint8Array.from(Buffer.from(f.Q, 'hex'))
 
-      const expected = f.expected ? Buffer.from(f.expected, 'hex') : null
+      const expected = f.expected ? Uint8Array.from(Buffer.from(f.expected, 'hex')) : null
       let description = `${f.P} + ${f.Q} = ${f.expected ? f.expected : null}`
       if (f.description) description += ` (${f.description})`
 
@@ -41,8 +41,8 @@ function test (binding) {
     })
 
     fpoints.invalid.pointAdd.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
-      const q = Buffer.from(f.Q, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
+      const q = Uint8Array.from(Buffer.from(f.Q, 'hex'))
 
       t.throws(() => {
         binding.pointAdd(p, q)
@@ -54,10 +54,10 @@ function test (binding) {
 
   tape('pointAddScalar', (t) => {
     fpoints.valid.pointAddScalar.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
-      const d = Buffer.from(f.d, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
+      const d = Uint8Array.from(Buffer.from(f.d, 'hex'))
 
-      const expected = f.expected ? Buffer.from(f.expected, 'hex') : null
+      const expected = f.expected ? Uint8Array.from(Buffer.from(f.expected, 'hex')) : null
       let description = `${f.P} + ${f.d} = ${f.expected ? f.expected : null}`
       if (f.description) description += ` (${f.description})`
 
@@ -69,8 +69,8 @@ function test (binding) {
     })
 
     fpoints.invalid.pointAddScalar.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
-      const d = Buffer.from(f.d, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
+      const d = Uint8Array.from(Buffer.from(f.d, 'hex'))
 
       t.throws(() => {
         binding.pointAddScalar(p, d)
@@ -82,14 +82,14 @@ function test (binding) {
 
   tape('pointCompress', (t) => {
     fpoints.valid.pointCompress.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
-      const expected = Buffer.from(f.expected, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
+      const expected = Uint8Array.from(Buffer.from(f.expected, 'hex'))
 
       t.same(binding.pointCompress(p, f.compress), expected)
     })
 
     fpoints.invalid.pointCompress.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
 
       t.throws(() => {
         binding.pointCompress(p)
@@ -101,9 +101,9 @@ function test (binding) {
 
   tape('pointFromScalar', (t) => {
     fpoints.valid.pointFromScalar.forEach((f) => {
-      const d = Buffer.from(f.d, 'hex')
+      const d = Uint8Array.from(Buffer.from(f.d, 'hex'))
 
-      const expected = Buffer.from(f.expected, 'hex')
+      const expected = Uint8Array.from(Buffer.from(f.expected, 'hex'))
       let description = `${f.d} * G = ${f.expected}`
       if (f.description) description += ` (${f.description})`
 
@@ -115,7 +115,7 @@ function test (binding) {
     })
 
     fpoints.invalid.pointFromScalar.forEach((f) => {
-      const d = Buffer.from(f.d, 'hex')
+      const d = Uint8Array.from(Buffer.from(f.d, 'hex'))
 
       t.throws(() => {
         binding.pointFromScalar(d)
@@ -127,10 +127,10 @@ function test (binding) {
 
   tape('pointMultiply', (t) => {
     fpoints.valid.pointMultiply.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
-      const d = Buffer.from(f.d, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
+      const d = Uint8Array.from(Buffer.from(f.d, 'hex'))
 
-      const expected = f.expected ? Buffer.from(f.expected, 'hex') : null
+      const expected = f.expected ? Uint8Array.from(Buffer.from(f.expected, 'hex')) : null
       let description = `${f.P} * ${f.d} = ${f.expected ? f.expected : null}`
       if (f.description) description += ` (${f.description})`
 
@@ -142,8 +142,8 @@ function test (binding) {
     })
 
     fpoints.invalid.pointMultiply.forEach((f) => {
-      const p = Buffer.from(f.P, 'hex')
-      const d = Buffer.from(f.d, 'hex')
+      const p = Uint8Array.from(Buffer.from(f.P, 'hex'))
+      const d = Uint8Array.from(Buffer.from(f.d, 'hex'))
 
       t.throws(() => {
         binding.pointMultiply(p, d)

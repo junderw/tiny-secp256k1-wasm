@@ -2,8 +2,8 @@
   "name": "tiny-secp256k1-wasm",
   "version": "0.0.1",
   "description": "A library for WASM bindings for tiny-secp256k1",
-  "main": "pkg/wrapper.js",
-  "types": "pkg/wrapper.d.ts",
+  "main": "pkg/tiny_secp256k1_wasm.js",
+  "types": "pkg/tiny_secp256k1_wasm.d.ts",
   "files": [
     "pkg"
   ],

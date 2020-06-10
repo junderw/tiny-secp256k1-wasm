@@ -1,4 +1,4 @@
-const secp = require('../pkg/wrapper');
+const secp = require('..');
 const ecc = require('tiny-secp256k1/js');
 const eccNative = require('tiny-secp256k1/native');
 const bitcoinTS = require('bitcoin-ts');
@@ -72,7 +72,7 @@ async function main(args) {
       'JS             ',
     );
     const rsWasmT = await performBench(
-      secp[fixture.name].bind(secp),
+      secp[fixture.name],
       fixture,
       'OUR-WASM       ',
     );
