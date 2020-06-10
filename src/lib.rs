@@ -18,12 +18,12 @@ pub fn is_point(ctx_ptr: *const ffi::Context, p: &JsBuffer, pubkey: &mut ffi::Pu
     unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), p.len()) != 0 }
 }
 
-pub fn is_private(ctx: *const secp256k1_sys::Context, x: *const u8) -> bool {
-    unsafe { ffi::secp256k1_ec_seckey_verify(ctx, x) == 1 }
+pub fn is_private(ctx: *const secp256k1_sys::Context, x: &JsBuffer) -> bool {
+    x.len() == 32 && unsafe { ffi::secp256k1_ec_seckey_verify(ctx, x.as_c_ptr()) == 1 }
 }
 
 pub fn is_tweak(ctx: *const secp256k1_sys::Context, tweak: &JsBuffer) -> bool {
-    *tweak == Box::new([0u8; 32]) || is_private(ctx, tweak.as_c_ptr())
+    *tweak == Box::new([0u8; 32]) || is_private(ctx, tweak)
 }
 
 #[wasm_bindgen]
@@ -42,9 +42,6 @@ impl TinySecp {
 
     #[wasm_bindgen(js_name = isPoint)]
     pub fn is_point(&self, p: JsBuffer) -> bool {
-        if p.len() != 33 && p.len() != 65 {
-            return false;
-        }
         is_point(*self.secp.ctx(), &p, &mut ffi::PublicKey::new())
     }
 
@@ -62,7 +59,7 @@ impl TinySecp {
 
     #[wasm_bindgen(js_name = isPrivate)]
     pub fn is_private(&self, x: JsBuffer) -> bool {
-        is_private(*self.secp.ctx(), x.as_c_ptr())
+        is_private(*self.secp.ctx(), &x)
     }
     #[wasm_bindgen(js_name = pointAdd)]
     pub fn point_add(
@@ -108,16 +105,15 @@ impl TinySecp {
         tweak: JsBuffer,
         compressed: Option<bool>,
     ) -> Result<JsValue, JsValue> {
+        let is_compressed = compressed.unwrap_or(p.len() == 33);
         if !is_tweak(*self.secp.ctx(), &tweak) {
             return Err(JsValue::from(TypeError::new("Expected Tweak")));
         }
-        let mut pubkey = ffi::PublicKey::new();
-        if !is_point(*self.secp.ctx(), &p, &mut pubkey) {
-            return Err(JsValue::from(TypeError::new("Expected Point")));
-        }
-
         let mut puba = PublicKey::from_slice(&p)
             .map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
+        if !self.is_point(p) {
+            return Err(JsValue::from(TypeError::new("Expected Point")));
+        }
 
         let key_option = match puba.add_exp_assign(&self.secp, &tweak) {
             Ok(a) => Some(a),
@@ -127,8 +123,6 @@ impl TinySecp {
         if key_option == None {
             return Ok(JsValue::NULL);
         }
-
-        let is_compressed = compressed.unwrap_or(p.len() == 33);
 
         if is_compressed {
             unsafe {
