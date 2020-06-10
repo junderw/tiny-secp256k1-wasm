@@ -1,5 +1,4 @@
-const pkg = require('./tiny_secp256k1_wasm');
-const wasm = new pkg.TinySecp();
+const wasm = require('./tiny_secp256k1_wasm');
 
 function isPoint (p) {
   return wasm.isPoint(p)
