@@ -17,6 +17,7 @@ fi
 
 # Copy bench file over
 cp "$DIR/dontuse_bench.js" "$DIR/../tmp/bench.js"
+cp "$DIR/wrapper.js" "$DIR/../pkg/wrapper.js"
 
 # Run bench
 node "$DIR/../tmp/bench.js"
