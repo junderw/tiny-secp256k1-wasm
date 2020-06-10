@@ -238,7 +238,10 @@ impl TinySecp {
         let mut tweak_clone = tweak.clone();
 
         unsafe {
-            ffi::secp256k1_ec_privkey_negate(*self.secp.ctx(), tweak_clone.as_mut_c_ptr());
+            assert_eq!(
+                ffi::secp256k1_ec_privkey_negate(*self.secp.ctx(), tweak_clone.as_mut_c_ptr()),
+                1
+            );
         }
 
         let result = match sk1.add_assign(&tweak_clone) {
@@ -326,10 +329,4 @@ impl TinySecp {
             Err(_) => Ok(false),
         }
     }
-}
-
-#[wasm_bindgen(start)]
-pub fn main() {
-    #[cfg(feature = "console_error_panic_hook")]
-    console_error_panic_hook::set_once();
 }
