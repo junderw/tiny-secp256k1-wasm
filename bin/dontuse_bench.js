@@ -1,4 +1,4 @@
-const pkg = require('../pkg');
+const secp = require('../pkg/wrapper');
 const ecc = require('tiny-secp256k1/js');
 const eccNative = require('tiny-secp256k1/native');
 const bitcoinTS = require('bitcoin-ts');
@@ -52,7 +52,6 @@ async function performBench(func, fixture, typeName) {
 
 async function main(args) {
   const secp256k1 = await instantiateSecp256k1();
-  const secp = new pkg.TinySecp();
   const slowerNames = [];
   console.log(
     '------------------------------------------------------------------',
