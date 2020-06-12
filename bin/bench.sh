@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # Build wasm-pack using clang-9
 cd "$DIR/.."
-if [ ! -f pkg/wrapper.js ]; then
+if [ ! -d pkg ]; then
   npm run build
 fi
 
@@ -19,7 +19,6 @@ fi
 
 # Copy bench file over
 cp "$DIR/dontuse_bench.js" "$DIR/../tmp/bench.js"
-cp "$DIR/wrapper.js" "$DIR/../pkg/wrapper.js"
 
 # Run bench
 node "$DIR/../tmp/bench.js"
