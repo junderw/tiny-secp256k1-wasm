@@ -117,17 +117,17 @@ const FIXTURES = [
     bitcoinTSEquiv: null, // has none
   },
   {
-    name: 'isPointCompressed',
-    notes: '',
-    iterations: 10000,
-    args: [PUBKEY_C],
-    bitcoinTSEquiv: null,
-  },
-  {
     name: 'isPoint',
     notes: ' with uncompressed pubkey',
     iterations: 1000000,
     args: [PUBKEY_UC],
+    bitcoinTSEquiv: null,
+  },
+  {
+    name: 'isPointCompressed',
+    notes: '',
+    iterations: 10000,
+    args: [PUBKEY_C],
     bitcoinTSEquiv: null,
   },
   {
@@ -152,11 +152,25 @@ const FIXTURES = [
     bitcoinTSEquiv: null,
   },
   {
+    name: 'pointAdd',
+    notes: ' with uncompressed',
+    iterations: 1000,
+    args: [PUBKEY_UC, PUBKEY_UC2, false],
+    bitcoinTSEquiv: null,
+  },
+  {
     name: 'pointAddScalar',
     notes: '',
     iterations: 1000,
     args: [PUBKEY_C, RANDOM_KEY2, true],
     bitcoinTSEquiv: secp256k1 => secp256k1.addTweakPublicKeyCompressed,
+  },
+  {
+    name: 'pointAddScalar',
+    notes: ' with uncompressed',
+    iterations: 1000,
+    args: [PUBKEY_UC, RANDOM_KEY2, false],
+    bitcoinTSEquiv: null,
   },
   {
     name: 'pointCompress',
@@ -178,6 +192,13 @@ const FIXTURES = [
     iterations: 1000,
     args: [PUBKEY_C, RANDOM_KEY, true],
     bitcoinTSEquiv: secp256k1 => secp256k1.mulTweakPublicKeyCompressed,
+  },
+  {
+    name: 'pointMultiply',
+    notes: ' with uncompressed',
+    iterations: 1000,
+    args: [PUBKEY_UC, RANDOM_KEY, false],
+    bitcoinTSEquiv: null,
   },
   {
     name: 'privateAdd',
@@ -216,6 +237,13 @@ const FIXTURES = [
       if (strict) return secp256k1.verifySignatureCompactLowS(sig, pub, hash);
       else return secp256k1.verifySignatureCompact(sig, pub, hash);
     },
+  },
+  {
+    name: 'verify',
+    notes: ' with uncompressed',
+    iterations: 1000,
+    args: [RANDOM_HASH, PUBKEY_UC, SIG],
+    bitcoinTSEquiv: null,
   },
 ];
 

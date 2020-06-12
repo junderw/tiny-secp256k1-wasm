@@ -23,10 +23,11 @@ fn is_point_internal(
     p: &JsBuffer,
     pubkey: &mut ffi::PublicKey,
 ) -> bool {
-    if p.len() != 33 && p.len() != 65 {
+    let plen = p.len();
+    if plen != 33 && plen != 65 {
         return false;
     }
-    unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), p.len()) != 0 }
+    unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), plen) != 0 }
 }
 
 fn is_private_internal(ctx: *const secp256k1_sys::Context, x: &JsBuffer) -> bool {
