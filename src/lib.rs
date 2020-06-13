@@ -47,6 +47,15 @@ impl From<Error> for JsValue {
 // TODO: Replace appropriate type. It might be good to subdivide into `Point`, `Scaler`, etc.
 type JsBuffer = Box<[u8]>;
 
+macro_rules! unwrap_or_jsnullres {
+    ( $e:expr ) => {
+        match $e {
+            Ok(x) => x,
+            Err(_) => return Ok(JsValue::NULL),
+        }
+    };
+}
+
 fn pubkey_from_slice(p: &JsBuffer) -> Result<PublicKey, Error> {
     let plen = p.len();
     if plen != 33 && plen != 65 {
@@ -99,6 +108,14 @@ fn is_tweak(tweak: &JsBuffer) -> bool {
     tweak.len() == 32 && compare_32_bytes(tweak, &secp256k1::constants::CURVE_ORDER) == -1
 }
 
+fn check_tweak(tweak: &JsBuffer) -> Result<(), Error> {
+    if !is_tweak(tweak) {
+        Err(Error::BadTweak)
+    } else {
+        Ok(())
+    }
+}
+
 unsafe fn uint8array_from_u8slice(data: &[u8]) -> JsValue {
     let array = js_sys::Uint8Array::view(data);
     return JsValue::from(array);
@@ -132,21 +149,12 @@ pub fn point_add(
     p_b: JsBuffer,
     compressed: Option<bool>,
 ) -> Result<JsValue, JsValue> {
+    let is_compressed = compressed.unwrap_or(p_a.len() == 33);
+
     let puba = pubkey_from_slice(&p_a)?;
     let pubb = pubkey_from_slice(&p_b)?;
 
-    let key_option = match puba.combine(&pubb) {
-        Ok(a) => Some(a),
-        Err(_) => None,
-    };
-
-    if key_option == None {
-        return Ok(JsValue::NULL);
-    }
-
-    let result = key_option.unwrap();
-
-    let is_compressed = compressed.unwrap_or(p_a.len() == 33);
+    let result = unwrap_or_jsnullres!(puba.combine(&pubb));
 
     if is_compressed {
         unsafe { Ok(uint8array_from_u8slice(&result.serialize())) }
@@ -161,19 +169,10 @@ pub fn point_add_scalar(
     compressed: Option<bool>,
 ) -> Result<JsValue, JsValue> {
     let is_compressed = compressed.unwrap_or(p.len() == 33);
-    if !is_tweak(&tweak) {
-        Err(Error::BadTweak)?
-    }
     let mut puba = pubkey_from_slice(&p)?;
+    check_tweak(&tweak)?;
 
-    let key_option = match puba.add_exp_assign(&SECP, &tweak) {
-        Ok(a) => Some(a),
-        Err(_) => None,
-    };
-
-    if key_option == None {
-        return Ok(JsValue::NULL);
-    }
+    unwrap_or_jsnullres!(puba.add_exp_assign(&SECP, &tweak));
 
     if is_compressed {
         unsafe { Ok(uint8array_from_u8slice(&puba.serialize())) }
@@ -211,17 +210,9 @@ pub fn point_multiply(
 ) -> Result<JsValue, JsValue> {
     let is_compressed = compressed.unwrap_or(p.len() == 33);
     let mut pubkey = pubkey_from_slice(&p)?;
-    if !is_tweak(&tweak) {
-        Err(Error::BadTweak)?
-    }
+    check_tweak(&tweak)?;
 
-    let newpubkey = match pubkey.mul_assign(&SECP, &tweak) {
-        Ok(a) => Some(a),
-        Err(_) => None,
-    };
-    if newpubkey == None {
-        return Ok(JsValue::NULL);
-    }
+    unwrap_or_jsnullres!(pubkey.mul_assign(&SECP, &tweak));
 
     if is_compressed {
         unsafe { Ok(uint8array_from_u8slice(&pubkey.serialize())) }
@@ -232,27 +223,18 @@ pub fn point_multiply(
 #[wasm_bindgen(js_name = privateAdd)]
 pub fn private_add(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
     let mut sk1 = seckey_from_slice(&d)?;
-    if !is_tweak(&tweak) {
-        Err(Error::BadTweak)?
-    }
+    check_tweak(&tweak)?;
 
-    let result = match sk1.add_assign(&tweak) {
-        Ok(a) => Some(a),
-        Err(_) => None,
-    };
-    if result == None {
-        return Ok(JsValue::NULL);
-    }
+    unwrap_or_jsnullres!(sk1.add_assign(&tweak));
+
     unsafe { Ok(uint8array_from_u8slice(&sk1[..])) }
 }
 #[wasm_bindgen(js_name = privateSub)]
 pub fn private_sub(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
     let mut sk1 = seckey_from_slice(&d)?;
-    if !is_tweak(&tweak) {
-        Err(Error::BadTweak)?
-    }
-    let mut tweak_clone = tweak.clone();
+    check_tweak(&tweak)?;
 
+    let mut tweak_clone = tweak.clone();
     unsafe {
         assert_eq!(
             ffi::secp256k1_ec_privkey_negate(*SECP.ctx(), tweak_clone.as_mut_c_ptr()),
@@ -260,13 +242,8 @@ pub fn private_sub(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
         );
     }
 
-    let result = match sk1.add_assign(&tweak_clone) {
-        Ok(a) => Some(a),
-        Err(_) => None,
-    };
-    if result == None {
-        return Ok(JsValue::NULL);
-    }
+    unwrap_or_jsnullres!(sk1.add_assign(&tweak_clone));
+
     unsafe { Ok(uint8array_from_u8slice(&sk1[..])) }
 }
 #[wasm_bindgen]
