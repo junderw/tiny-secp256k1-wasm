@@ -10,6 +10,8 @@ use wasm_bindgen::prelude::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+const ZERO: [u8; 32] = [0u8; 32];
+
 lazy_static! {
     static ref SECP: Secp256k1<secp256k1::All> = Secp256k1::new();
 }
@@ -30,12 +32,32 @@ fn is_point_internal(
     unsafe { ffi::secp256k1_ec_pubkey_parse(ctx_ptr, pubkey, p.as_c_ptr(), plen) != 0 }
 }
 
-fn is_private_internal(ctx: *const secp256k1_sys::Context, x: &JsBuffer) -> bool {
-    x.len() == 32 && unsafe { ffi::secp256k1_ec_seckey_verify(ctx, x.as_c_ptr()) == 1 }
+fn lt_order(p: &JsBuffer) -> bool {
+    for i in 0..32 {
+        if p[i] < secp256k1::constants::CURVE_ORDER[i] {
+            return true;
+        } else if p[i] > secp256k1::constants::CURVE_ORDER[i] {
+            return false;
+        }
+    }
+    return false;
 }
 
-fn is_tweak(ctx: *const secp256k1_sys::Context, tweak: &JsBuffer) -> bool {
-    *tweak == Box::new([0u8; 32]) || is_private_internal(ctx, tweak)
+fn eq_bytes(p: &JsBuffer, q: &[u8; 32]) -> bool {
+    for i in 0..32 {
+        if p[i] != q[i] {
+            return false;
+        }
+    }
+    return true;
+}
+
+fn is_private_internal(x: &JsBuffer) -> bool {
+    is_tweak(x) && !eq_bytes(x, &ZERO)
+}
+
+fn is_tweak(tweak: &JsBuffer) -> bool {
+    tweak.len() == 32 && lt_order(tweak)
 }
 
 #[wasm_bindgen(js_name = isPoint)]
@@ -57,7 +79,7 @@ pub fn is_point_compressed(p: JsBuffer) -> Result<bool, JsValue> {
 
 #[wasm_bindgen(js_name = isPrivate)]
 pub fn is_private(x: JsBuffer) -> bool {
-    is_private_internal(*SECP.ctx(), &x)
+    is_private_internal(&x)
 }
 
 #[wasm_bindgen(js_name = pointAdd)]
@@ -103,7 +125,7 @@ pub fn point_add_scalar(
     compressed: Option<bool>,
 ) -> Result<JsValue, JsValue> {
     let is_compressed = compressed.unwrap_or(p.len() == 33);
-    if !is_tweak(*SECP.ctx(), &tweak) {
+    if !is_tweak(&tweak) {
         return Err(JsValue::from(TypeError::new("Expected Tweak")));
     }
     let mut puba =
@@ -166,7 +188,7 @@ pub fn point_multiply(
     let is_compressed = compressed.unwrap_or(p.len() == 33);
     let mut pubkey =
         PublicKey::from_slice(&p).map_err(|_| JsValue::from(TypeError::new("Expected Point")))?;
-    if !is_tweak(*SECP.ctx(), &tweak) {
+    if !is_tweak(&tweak) {
         return Err(JsValue::from(TypeError::new("Expected Tweak")));
     }
 
@@ -194,7 +216,7 @@ pub fn point_multiply(
 pub fn private_add(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
     let mut sk1 =
         SecretKey::from_slice(&d).map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
-    if !is_tweak(*SECP.ctx(), &tweak) {
+    if !is_tweak(&tweak) {
         return Err(JsValue::from(TypeError::new("Expected Tweak")));
     }
 
@@ -214,7 +236,7 @@ pub fn private_add(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
 pub fn private_sub(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
     let mut sk1 =
         SecretKey::from_slice(&d).map_err(|_| JsValue::from(TypeError::new("Expected Private")))?;
-    if !is_tweak(*SECP.ctx(), &tweak) {
+    if !is_tweak(&tweak) {
         return Err(JsValue::from(TypeError::new("Expected Tweak")));
     }
     let mut tweak_clone = tweak.clone();

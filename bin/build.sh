@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 REL_WASM_PATH="./pkg/tiny_secp256k1_wasm_bg.wasm"
 IMAGE_TO_RUN="${1:-junderw/tiny-secp256k1-wasm-builder}"
 
