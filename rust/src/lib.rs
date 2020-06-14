@@ -131,14 +131,10 @@ pub fn is_point(p: JsBuffer) -> bool {
 
 #[wasm_bindgen(js_name = isPointCompressed)]
 pub fn is_point_compressed(p: JsBuffer) -> Result<bool, JsValue> {
-    let has_proper_len = p.len() == 33;
-    if !has_proper_len {
-        return Ok(false);
-    }
     if !is_point_internal(&p) {
         Err(Error::BadPoint)?
     }
-    Ok(has_proper_len)
+    Ok(p.len() == 33)
 }
 
 #[wasm_bindgen(js_name = isPrivate)]
