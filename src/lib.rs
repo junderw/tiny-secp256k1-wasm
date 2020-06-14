@@ -47,6 +47,14 @@ impl From<Error> for JsValue {
 // TODO: Replace appropriate type. It might be good to subdivide into `Point`, `Scaler`, etc.
 type JsBuffer = Box<[u8]>;
 
+#[wasm_bindgen]
+extern "C" {
+    pub type Buffer;
+
+    #[wasm_bindgen(static_method_of = Buffer)]
+    pub fn from(buffer: JsBuffer) -> Buffer;
+}
+
 macro_rules! unwrap_or_jsnullres {
     ( $e:expr ) => {
         match $e {
@@ -116,11 +124,6 @@ fn check_tweak(tweak: &JsBuffer) -> Result<(), Error> {
     }
 }
 
-unsafe fn uint8array_from_u8slice(data: &[u8]) -> JsValue {
-    let array = js_sys::Uint8Array::view(data);
-    return JsValue::from(array);
-}
-
 #[wasm_bindgen(js_name = isPoint)]
 pub fn is_point(p: JsBuffer) -> bool {
     is_point_internal(&p)
@@ -157,9 +160,11 @@ pub fn point_add(
     let result = unwrap_or_jsnullres!(puba.combine(&pubb));
 
     if is_compressed {
-        unsafe { Ok(uint8array_from_u8slice(&result.serialize())) }
+        Ok(JsValue::from(Buffer::from(Box::new(result.serialize()))))
     } else {
-        unsafe { Ok(uint8array_from_u8slice(&result.serialize_uncompressed())) }
+        Ok(JsValue::from(Buffer::from(Box::new(
+            result.serialize_uncompressed(),
+        ))))
     }
 }
 #[wasm_bindgen(js_name = pointAddScalar)]
@@ -175,31 +180,33 @@ pub fn point_add_scalar(
     unwrap_or_jsnullres!(puba.add_exp_assign(&SECP, &tweak));
 
     if is_compressed {
-        unsafe { Ok(uint8array_from_u8slice(&puba.serialize())) }
+        Ok(JsValue::from(Buffer::from(Box::new(puba.serialize()))))
     } else {
-        unsafe { Ok(uint8array_from_u8slice(&puba.serialize_uncompressed())) }
+        Ok(JsValue::from(Buffer::from(Box::new(
+            puba.serialize_uncompressed(),
+        ))))
     }
 }
 #[wasm_bindgen(js_name = pointCompress)]
-pub fn point_compress(p: JsBuffer, compressed: Option<bool>) -> Result<JsBuffer, JsValue> {
+pub fn point_compress(p: JsBuffer, compressed: Option<bool>) -> Result<Buffer, JsValue> {
     let is_compressed = compressed.unwrap_or(p.len() == 33);
     let puba = pubkey_from_slice(&p)?;
 
     if is_compressed {
-        Ok(Box::new(puba.serialize()))
+        Ok(Buffer::from(Box::new(puba.serialize())))
     } else {
-        Ok(Box::new(puba.serialize_uncompressed()))
+        Ok(Buffer::from(Box::new(puba.serialize_uncompressed())))
     }
 }
 #[wasm_bindgen(js_name = pointFromScalar)]
-pub fn point_from_scalar(d: JsBuffer, compressed: Option<bool>) -> Result<JsBuffer, JsValue> {
+pub fn point_from_scalar(d: JsBuffer, compressed: Option<bool>) -> Result<Buffer, JsValue> {
     let is_compressed = compressed.unwrap_or(true);
     let sk = seckey_from_slice(&d)?;
     let pk = PublicKey::from_secret_key(&SECP, &sk);
     if is_compressed {
-        Ok(Box::new(pk.serialize()))
+        Ok(Buffer::from(Box::new(pk.serialize())))
     } else {
-        Ok(Box::new(pk.serialize_uncompressed()))
+        Ok(Buffer::from(Box::new(pk.serialize_uncompressed())))
     }
 }
 #[wasm_bindgen(js_name = pointMultiply)]
@@ -215,9 +222,11 @@ pub fn point_multiply(
     unwrap_or_jsnullres!(pubkey.mul_assign(&SECP, &tweak));
 
     if is_compressed {
-        unsafe { Ok(uint8array_from_u8slice(&pubkey.serialize())) }
+        Ok(JsValue::from(Buffer::from(Box::new(pubkey.serialize()))))
     } else {
-        unsafe { Ok(uint8array_from_u8slice(&pubkey.serialize_uncompressed())) }
+        Ok(JsValue::from(Buffer::from(Box::new(
+            pubkey.serialize_uncompressed(),
+        ))))
     }
 }
 #[wasm_bindgen(js_name = privateAdd)]
@@ -227,7 +236,10 @@ pub fn private_add(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
 
     unwrap_or_jsnullres!(sk1.add_assign(&tweak));
 
-    unsafe { Ok(uint8array_from_u8slice(&sk1[..])) }
+    let mut key = [0u8; 32];
+    key[..32].clone_from_slice(&sk1[..]);
+
+    Ok(JsValue::from(Buffer::from(Box::new(key))))
 }
 #[wasm_bindgen(js_name = privateSub)]
 pub fn private_sub(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
@@ -244,25 +256,32 @@ pub fn private_sub(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
 
     unwrap_or_jsnullres!(sk1.add_assign(&tweak_clone));
 
-    unsafe { Ok(uint8array_from_u8slice(&sk1[..])) }
+    let mut key = [0u8; 32];
+    key[..32].clone_from_slice(&sk1[..]);
+
+    Ok(JsValue::from(Buffer::from(Box::new(key))))
 }
 #[wasm_bindgen]
-pub fn sign(hash: JsBuffer, x: JsBuffer) -> Result<JsBuffer, JsValue> {
+pub fn sign(hash: JsBuffer, x: JsBuffer) -> Result<Buffer, JsValue> {
     let msg_hash = message_from_slice(&hash)?;
     let pk = seckey_from_slice(&x)?;
-    Ok(Box::new(SECP.sign(&msg_hash, &pk).serialize_compact()))
+    Ok(Buffer::from(Box::new(
+        SECP.sign(&msg_hash, &pk).serialize_compact(),
+    )))
 }
 #[wasm_bindgen(js_name = signWithEntropy)]
 pub fn sign_with_entropy(
     hash: JsBuffer,
     x: JsBuffer,
     add_data: Option<JsBuffer>,
-) -> Result<JsBuffer, JsValue> {
+) -> Result<Buffer, JsValue> {
     let msg = message_from_slice(&hash)?;
     let sk = seckey_from_slice(&x)?;
 
     if add_data == None {
-        return Ok(Box::new(SECP.sign(&msg, &sk).serialize_compact()));
+        return Ok(Buffer::from(Box::new(
+            SECP.sign(&msg, &sk).serialize_compact(),
+        )));
     }
     let extra_bytes = add_data.unwrap();
     if extra_bytes.len() != 32 {
@@ -285,9 +304,9 @@ pub fn sign_with_entropy(
         );
     }
 
-    Ok(Box::new(
+    Ok(Buffer::from(Box::new(
         secp256k1::Signature::from(ret).serialize_compact(),
-    ))
+    )))
 }
 #[wasm_bindgen]
 pub fn verify(
