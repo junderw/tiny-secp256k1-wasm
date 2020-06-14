@@ -20,10 +20,10 @@ docker run \
   \`# Copy over all the data in the repo \`\
   \
   rsync -av \
-    --delete --exclude=.git/ --exclude=target/ --exclude=node_modules/ \
-    --exclude=tmp/ --exclude=pkg/ \
+    --delete --exclude=.git/ --exclude=rust/target/ --exclude=node_modules/ \
+    --exclude=tmp/ --exclude=rust/pkg/ \
       /data/ /datacopy/ >/dev/null 2>&1 && \
-  cd /datacopy && \
+  cd /datacopy/rust/ && \
   \
   \`# Build with wasm-pack \`\
   \
@@ -31,8 +31,8 @@ docker run \
   \
   \`# Insert the wrapper and point package.json to the wrapper \`\
   \
-  cp bin/tiny_secp256k1_wasm.d.ts pkg/tiny_secp256k1_wasm.d.ts && \
-  rm pkg/package.json pkg/LICENSE pkg/README.md pkg/.gitignore && \
+  cp ../bin/tiny_secp256k1_wasm.d.ts pkg/tiny_secp256k1_wasm.d.ts && \
+  rm pkg/package.json pkg/LICENSE pkg/.gitignore && \
   \
   \`# Shrink the wasm binary \`\
   \
