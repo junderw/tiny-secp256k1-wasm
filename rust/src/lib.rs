@@ -1,8 +1,9 @@
-use js_sys::TypeError;
+use js_sys::{TypeError, Uint8Array};
 use secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
 use secp256k1_sys as ffi;
 use secp256k1_sys::CPtr;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -53,6 +54,9 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = Buffer)]
     pub fn from(buffer: JsBuffer) -> Buffer;
+
+    #[wasm_bindgen(js_name = isBuffer, static_method_of = Buffer)]
+    pub fn is_buffer(val: &JsValue) -> bool;
 }
 
 macro_rules! unwrap_or_jsnullres {
@@ -64,59 +68,76 @@ macro_rules! unwrap_or_jsnullres {
     };
 }
 
-fn pubkey_from_slice(p: &JsBuffer) -> Result<PublicKey, Error> {
-    let plen = p.len();
+macro_rules! get_buffer_return {
+    ( $val:expr, $err:expr ) => {
+        match maybe_buffer($val) {
+            Some(v) => v,
+            None => return $err,
+        }
+    };
+}
+
+fn maybe_buffer(buf: &JsValue) -> Option<&Uint8Array> {
+    if Buffer::is_buffer(buf) {
+        Some(buf.unchecked_ref::<Uint8Array>())
+    } else {
+        None
+    }
+}
+
+fn pubkey_from_slice(p: &Uint8Array) -> Result<PublicKey, Error> {
+    let plen = p.length();
     if plen != 33 && plen != 65 {
         return Err(Error::BadPoint);
     }
-    if plen == 33 && p[0] != 2u8 && p[0] != 3u8 {
+    if plen == 33 && p.get_index(0) != 2u8 && p.get_index(0) != 3u8 {
         return Err(Error::BadPoint);
     }
-    if plen == 65 && p[0] != 4u8 {
+    if plen == 65 && p.get_index(0) != 4u8 {
         return Err(Error::BadPoint);
     }
-    PublicKey::from_slice(&p).map_err(|_| Error::BadPoint)
+    PublicKey::from_slice(&p.to_vec()).map_err(|_| Error::BadPoint)
 }
 
-fn seckey_from_slice(p: &JsBuffer) -> Result<SecretKey, Error> {
-    SecretKey::from_slice(&p).map_err(|_| Error::BadPrivate)
+fn seckey_from_slice(p: &Uint8Array) -> Result<SecretKey, Error> {
+    SecretKey::from_slice(&p.to_vec()).map_err(|_| Error::BadPrivate)
 }
 
-fn message_from_slice(p: &JsBuffer) -> Result<Message, Error> {
-    Message::from_slice(&p).map_err(|_| Error::BadHash)
+fn message_from_slice(p: &Uint8Array) -> Result<Message, Error> {
+    Message::from_slice(&p.to_vec()).map_err(|_| Error::BadHash)
 }
 
-fn signature_from_slice(p: &JsBuffer) -> Result<Signature, Error> {
-    Signature::from_compact(&p).map_err(|_| Error::BadSignature)
+fn signature_from_slice(p: &Uint8Array) -> Result<Signature, Error> {
+    Signature::from_compact(&p.to_vec()).map_err(|_| Error::BadSignature)
 }
 
-fn is_point_internal(p: &JsBuffer) -> bool {
-    match pubkey_from_slice(&p) {
+fn is_point_internal(p: &Uint8Array) -> bool {
+    match pubkey_from_slice(p) {
         Ok(_) => true,
         Err(_) => false,
     }
 }
 
-fn compare_32_bytes(p: &JsBuffer, q: &[u8; 32]) -> i8 {
-    for i in 0..32 {
-        if p[i] < q[i] {
+fn compare_32_bytes(p: &Uint8Array, q: &[u8; 32]) -> i8 {
+    for i in 0..32u32 {
+        if p.get_index(i) < q[i as usize] {
             return -1;
-        } else if p[i] > q[i] {
+        } else if p.get_index(i) > q[i as usize] {
             return 1;
         }
     }
     return 0;
 }
 
-fn is_private_internal(x: &JsBuffer) -> bool {
+fn is_private_internal(x: &Uint8Array) -> bool {
     is_tweak(x) && compare_32_bytes(x, &ZERO) != 0
 }
 
-fn is_tweak(tweak: &JsBuffer) -> bool {
-    tweak.len() == 32 && compare_32_bytes(tweak, &secp256k1::constants::CURVE_ORDER) == -1
+fn is_tweak(tweak: &Uint8Array) -> bool {
+    tweak.length() == 32 && compare_32_bytes(tweak, &secp256k1::constants::CURVE_ORDER) == -1
 }
 
-fn check_tweak(tweak: &JsBuffer) -> Result<(), Error> {
+fn check_tweak(tweak: &Uint8Array) -> Result<(), Error> {
     if !is_tweak(tweak) {
         Err(Error::BadTweak)
     } else {
@@ -125,33 +146,39 @@ fn check_tweak(tweak: &JsBuffer) -> Result<(), Error> {
 }
 
 #[wasm_bindgen(js_name = isPoint)]
-pub fn is_point(p: JsBuffer) -> bool {
-    is_point_internal(&p)
+pub fn is_point(p: &JsValue) -> bool {
+    let buf = get_buffer_return!(p, false);
+    is_point_internal(buf)
 }
 
 #[wasm_bindgen(js_name = isPointCompressed)]
-pub fn is_point_compressed(p: JsBuffer) -> Result<bool, JsValue> {
-    if !is_point_internal(&p) {
+pub fn is_point_compressed(p: &JsValue) -> Result<bool, JsValue> {
+    let buf = get_buffer_return!(p, Ok(false));
+    if !is_point_internal(buf) {
         Err(Error::BadPoint)?
     }
-    Ok(p.len() == 33)
+    Ok(buf.length() == 33)
 }
 
 #[wasm_bindgen(js_name = isPrivate)]
-pub fn is_private(x: JsBuffer) -> bool {
-    is_private_internal(&x)
+pub fn is_private(x: &JsValue) -> bool {
+    let x_buf = get_buffer_return!(x, false);
+    is_private_internal(x_buf)
 }
 
 #[wasm_bindgen(js_name = pointAdd)]
 pub fn point_add(
-    p_a: JsBuffer,
-    p_b: JsBuffer,
+    p_a: &JsValue,
+    p_b: &JsValue,
     compressed: Option<bool>,
 ) -> Result<JsValue, JsValue> {
-    let is_compressed = compressed.unwrap_or(p_a.len() == 33);
+    let buf_a = get_buffer_return!(p_a, Err(JsValue::from(Error::BadPoint)));
+    let buf_b = get_buffer_return!(p_b, Err(JsValue::from(Error::BadPoint)));
 
-    let puba = pubkey_from_slice(&p_a)?;
-    let pubb = pubkey_from_slice(&p_b)?;
+    let is_compressed = compressed.unwrap_or(buf_a.length() == 33);
+
+    let puba = pubkey_from_slice(&buf_a)?;
+    let pubb = pubkey_from_slice(&buf_b)?;
 
     let result = unwrap_or_jsnullres!(puba.combine(&pubb));
 
@@ -165,15 +192,18 @@ pub fn point_add(
 }
 #[wasm_bindgen(js_name = pointAddScalar)]
 pub fn point_add_scalar(
-    p: JsBuffer,
-    tweak: JsBuffer,
+    p: &JsValue,
+    tweak: &JsValue,
     compressed: Option<bool>,
 ) -> Result<JsValue, JsValue> {
-    let is_compressed = compressed.unwrap_or(p.len() == 33);
-    let mut puba = pubkey_from_slice(&p)?;
-    check_tweak(&tweak)?;
+    let buf = get_buffer_return!(p, Err(JsValue::from(Error::BadPoint)));
+    let buf_tweak = get_buffer_return!(tweak, Err(JsValue::from(Error::BadTweak)));
 
-    unwrap_or_jsnullres!(puba.add_exp_assign(&SECP, &tweak));
+    let is_compressed = compressed.unwrap_or(buf.length() == 33);
+    let mut puba = pubkey_from_slice(&buf)?;
+    check_tweak(&buf_tweak)?;
+
+    unwrap_or_jsnullres!(puba.add_exp_assign(&SECP, &buf_tweak.to_vec()));
 
     if is_compressed {
         Ok(JsValue::from(Buffer::from(Box::new(puba.serialize()))))
@@ -184,9 +214,11 @@ pub fn point_add_scalar(
     }
 }
 #[wasm_bindgen(js_name = pointCompress)]
-pub fn point_compress(p: JsBuffer, compressed: Option<bool>) -> Result<Buffer, JsValue> {
-    let is_compressed = compressed.unwrap_or(p.len() == 33);
-    let puba = pubkey_from_slice(&p)?;
+pub fn point_compress(p: &JsValue, compressed: Option<bool>) -> Result<Buffer, JsValue> {
+    let buf = get_buffer_return!(p, Err(JsValue::from(Error::BadPoint)));
+
+    let is_compressed = compressed.unwrap_or(buf.length() == 33);
+    let puba = pubkey_from_slice(&buf)?;
 
     if is_compressed {
         Ok(Buffer::from(Box::new(puba.serialize())))
@@ -195,9 +227,11 @@ pub fn point_compress(p: JsBuffer, compressed: Option<bool>) -> Result<Buffer, J
     }
 }
 #[wasm_bindgen(js_name = pointFromScalar)]
-pub fn point_from_scalar(d: JsBuffer, compressed: Option<bool>) -> Result<Buffer, JsValue> {
+pub fn point_from_scalar(d: &JsValue, compressed: Option<bool>) -> Result<Buffer, JsValue> {
+    let buf = get_buffer_return!(d, Err(JsValue::from(Error::BadPrivate)));
+
     let is_compressed = compressed.unwrap_or(true);
-    let sk = seckey_from_slice(&d)?;
+    let sk = seckey_from_slice(&buf)?;
     let pk = PublicKey::from_secret_key(&SECP, &sk);
     if is_compressed {
         Ok(Buffer::from(Box::new(pk.serialize())))
@@ -207,15 +241,18 @@ pub fn point_from_scalar(d: JsBuffer, compressed: Option<bool>) -> Result<Buffer
 }
 #[wasm_bindgen(js_name = pointMultiply)]
 pub fn point_multiply(
-    p: JsBuffer,
-    tweak: JsBuffer,
+    p: &JsValue,
+    tweak: &JsValue,
     compressed: Option<bool>,
 ) -> Result<JsValue, JsValue> {
-    let is_compressed = compressed.unwrap_or(p.len() == 33);
-    let mut pubkey = pubkey_from_slice(&p)?;
-    check_tweak(&tweak)?;
+    let buf = get_buffer_return!(p, Err(JsValue::from(Error::BadPoint)));
+    let buf_tweak = get_buffer_return!(tweak, Err(JsValue::from(Error::BadTweak)));
 
-    unwrap_or_jsnullres!(pubkey.mul_assign(&SECP, &tweak));
+    let is_compressed = compressed.unwrap_or(buf.length() == 33);
+    let mut pubkey = pubkey_from_slice(&buf)?;
+    check_tweak(&buf_tweak)?;
+
+    unwrap_or_jsnullres!(pubkey.mul_assign(&SECP, &buf_tweak.to_vec()));
 
     if is_compressed {
         Ok(JsValue::from(Buffer::from(Box::new(pubkey.serialize()))))
@@ -226,11 +263,14 @@ pub fn point_multiply(
     }
 }
 #[wasm_bindgen(js_name = privateAdd)]
-pub fn private_add(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
-    let mut sk1 = seckey_from_slice(&d)?;
-    check_tweak(&tweak)?;
+pub fn private_add(d: &JsValue, tweak: &JsValue) -> Result<JsValue, JsValue> {
+    let buf = get_buffer_return!(d, Err(JsValue::from(Error::BadPrivate)));
+    let buf_tweak = get_buffer_return!(tweak, Err(JsValue::from(Error::BadTweak)));
 
-    unwrap_or_jsnullres!(sk1.add_assign(&tweak));
+    let mut sk1 = seckey_from_slice(&buf)?;
+    check_tweak(&buf_tweak)?;
+
+    unwrap_or_jsnullres!(sk1.add_assign(&buf_tweak.to_vec()));
 
     let mut key = [0u8; 32];
     key[..32].clone_from_slice(&sk1[..]);
@@ -238,11 +278,14 @@ pub fn private_add(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
     Ok(JsValue::from(Buffer::from(Box::new(key))))
 }
 #[wasm_bindgen(js_name = privateSub)]
-pub fn private_sub(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
-    let mut sk1 = seckey_from_slice(&d)?;
-    check_tweak(&tweak)?;
+pub fn private_sub(d: &JsValue, tweak: &JsValue) -> Result<JsValue, JsValue> {
+    let buf = get_buffer_return!(d, Err(JsValue::from(Error::BadPrivate)));
+    let buf_tweak = get_buffer_return!(tweak, Err(JsValue::from(Error::BadTweak)));
 
-    let mut tweak_clone = tweak.clone();
+    let mut sk1 = seckey_from_slice(&buf)?;
+    check_tweak(&buf_tweak)?;
+
+    let mut tweak_clone = buf_tweak.to_vec();
     unsafe {
         assert_eq!(
             ffi::secp256k1_ec_privkey_negate(*SECP.ctx(), tweak_clone.as_mut_c_ptr()),
@@ -258,29 +301,36 @@ pub fn private_sub(d: JsBuffer, tweak: JsBuffer) -> Result<JsValue, JsValue> {
     Ok(JsValue::from(Buffer::from(Box::new(key))))
 }
 #[wasm_bindgen]
-pub fn sign(hash: JsBuffer, x: JsBuffer) -> Result<Buffer, JsValue> {
-    let msg_hash = message_from_slice(&hash)?;
-    let pk = seckey_from_slice(&x)?;
+pub fn sign(hash: &JsValue, x: &JsValue) -> Result<Buffer, JsValue> {
+    let buf_hash = get_buffer_return!(hash, Err(JsValue::from(Error::BadHash)));
+    let buf_x = get_buffer_return!(x, Err(JsValue::from(Error::BadPrivate)));
+
+    let msg_hash = message_from_slice(&buf_hash)?;
+    let pk = seckey_from_slice(&buf_x)?;
     Ok(Buffer::from(Box::new(
         SECP.sign(&msg_hash, &pk).serialize_compact(),
     )))
 }
 #[wasm_bindgen(js_name = signWithEntropy)]
 pub fn sign_with_entropy(
-    hash: JsBuffer,
-    x: JsBuffer,
-    add_data: Option<JsBuffer>,
+    hash: &JsValue,
+    x: &JsValue,
+    add_data: JsValue,
 ) -> Result<Buffer, JsValue> {
-    let msg = message_from_slice(&hash)?;
-    let sk = seckey_from_slice(&x)?;
+    let buf_hash = get_buffer_return!(hash, Err(JsValue::from(Error::BadHash)));
+    let buf_x = get_buffer_return!(x, Err(JsValue::from(Error::BadPrivate)));
 
-    if add_data == None {
+    let msg = message_from_slice(&buf_hash)?;
+    let sk = seckey_from_slice(&buf_x)?;
+
+    if add_data == JsValue::NULL || add_data == JsValue::UNDEFINED {
         return Ok(Buffer::from(Box::new(
             SECP.sign(&msg, &sk).serialize_compact(),
         )));
     }
-    let extra_bytes = add_data.unwrap();
-    if extra_bytes.len() != 32 {
+
+    let extra_bytes = get_buffer_return!(&add_data, Err(JsValue::from(Error::BadExtraData)));
+    if extra_bytes.length() != 32 {
         Err(Error::BadExtraData)?
     }
     let mut ret = ffi::Signature::new();
@@ -294,7 +344,7 @@ pub fn sign_with_entropy(
                 msg.as_c_ptr(),
                 sk.as_c_ptr(),
                 ffi::secp256k1_nonce_function_rfc6979,
-                extra_bytes.as_c_ptr() as *const ffi::types::c_void
+                extra_bytes.to_vec().as_c_ptr() as *const ffi::types::c_void
             ),
             1
         );
@@ -306,15 +356,19 @@ pub fn sign_with_entropy(
 }
 #[wasm_bindgen]
 pub fn verify(
-    hash: JsBuffer,
-    q: JsBuffer,
-    signature: JsBuffer,
+    hash: &JsValue,
+    q: &JsValue,
+    signature: &JsValue,
     strict: Option<bool>,
 ) -> Result<bool, JsValue> {
+    let buf_hash = get_buffer_return!(hash, Err(JsValue::from(Error::BadHash)));
+    let buf_q = get_buffer_return!(q, Err(JsValue::from(Error::BadPoint)));
+    let buf_sig = get_buffer_return!(signature, Err(JsValue::from(Error::BadPoint)));
+
     let is_strict = strict.unwrap_or(false);
-    let pubkey = pubkey_from_slice(&q)?;
-    let msg = message_from_slice(&hash)?;
-    let mut sig = signature_from_slice(&signature)?;
+    let pubkey = pubkey_from_slice(&buf_q)?;
+    let msg = message_from_slice(&buf_hash)?;
+    let mut sig = signature_from_slice(&buf_sig)?;
     if !is_strict {
         sig.normalize_s();
     }
