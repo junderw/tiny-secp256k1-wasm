@@ -41,7 +41,8 @@ docker run \
   \
   \`# Set permissions for pkg and target and copy over to our repo folder \`\
   \
-  chown -R $UID:$UID pkg/ && \
-  chown -R $UID:$UID target/ && \
-  rsync -av pkg/ /data/pkg/ >/dev/null 2>&1 \
+  chown -R $UID:$UID . && \
+  rsync -av pkg/ /data/pkg/ >/dev/null 2>&1 && \
+  rsync -av Cargo.lock /data/rust/Cargo.lock >/dev/null 2>&1 && \
+  rsync -av --delete target/ /data/rust/target/ >/dev/null 2>&1
   "

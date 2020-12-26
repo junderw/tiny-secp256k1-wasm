@@ -2,7 +2,6 @@
 package-lock.json
 /node_modules
 /pkg
-/rust/Cargo.lock
 /rust/target
 /rust/pkg
 /tmp
