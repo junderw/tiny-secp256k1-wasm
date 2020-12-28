@@ -1,5 +1,5 @@
 use js_sys::{TypeError, Uint8Array};
-use secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
+use secp256k1::{Message, PublicKey, SecretKey, Signature, SECP256K1};
 use secp256k1_sys as ffi;
 use secp256k1_sys::CPtr;
 use wasm_bindgen::prelude::*;
@@ -7,12 +7,6 @@ use wasm_bindgen::JsCast;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-#[macro_use]
-extern crate lazy_static;
-lazy_static! {
-    static ref SECP: Secp256k1<secp256k1::All> = Secp256k1::new();
-}
 
 const ZERO: [u8; 32] = [0u8; 32];
 
@@ -203,7 +197,7 @@ pub fn point_add_scalar(
     let mut puba = pubkey_from_slice(&buf)?;
     check_tweak(&buf_tweak)?;
 
-    unwrap_or_jsnullres!(puba.add_exp_assign(&SECP, &buf_tweak.to_vec()));
+    unwrap_or_jsnullres!(puba.add_exp_assign(&SECP256K1, &buf_tweak.to_vec()));
 
     if is_compressed {
         Ok(JsValue::from(Buffer::from(Box::new(puba.serialize()))))
@@ -232,7 +226,7 @@ pub fn point_from_scalar(d: &JsValue, compressed: Option<bool>) -> Result<Buffer
 
     let is_compressed = compressed.unwrap_or(true);
     let sk = seckey_from_slice(&buf)?;
-    let pk = PublicKey::from_secret_key(&SECP, &sk);
+    let pk = PublicKey::from_secret_key(&SECP256K1, &sk);
     if is_compressed {
         Ok(Buffer::from(Box::new(pk.serialize())))
     } else {
@@ -252,7 +246,7 @@ pub fn point_multiply(
     let mut pubkey = pubkey_from_slice(&buf)?;
     check_tweak(&buf_tweak)?;
 
-    unwrap_or_jsnullres!(pubkey.mul_assign(&SECP, &buf_tweak.to_vec()));
+    unwrap_or_jsnullres!(pubkey.mul_assign(&SECP256K1, &buf_tweak.to_vec()));
 
     if is_compressed {
         Ok(JsValue::from(Buffer::from(Box::new(pubkey.serialize()))))
@@ -286,11 +280,13 @@ pub fn private_sub(d: &JsValue, tweak: &JsValue) -> Result<JsValue, JsValue> {
     check_tweak(&buf_tweak)?;
 
     let mut tweak_clone = buf_tweak.to_vec();
-    unsafe {
-        assert_eq!(
-            ffi::secp256k1_ec_privkey_negate(*SECP.ctx(), tweak_clone.as_mut_c_ptr()),
-            1
-        );
+    if tweak_clone != ZERO {
+        unsafe {
+            assert_eq!(
+                ffi::secp256k1_ec_seckey_negate(*SECP256K1.ctx(), tweak_clone.as_mut_c_ptr()),
+                1
+            );
+        }
     }
 
     unwrap_or_jsnullres!(sk1.add_assign(&tweak_clone));
@@ -308,7 +304,7 @@ pub fn sign(hash: &JsValue, x: &JsValue) -> Result<Buffer, JsValue> {
     let msg_hash = message_from_slice(&buf_hash)?;
     let pk = seckey_from_slice(&buf_x)?;
     Ok(Buffer::from(Box::new(
-        SECP.sign(&msg_hash, &pk).serialize_compact(),
+        SECP256K1.sign(&msg_hash, &pk).serialize_compact(),
     )))
 }
 #[wasm_bindgen(js_name = signWithEntropy)]
@@ -325,7 +321,7 @@ pub fn sign_with_entropy(
 
     if add_data == JsValue::NULL || add_data == JsValue::UNDEFINED {
         return Ok(Buffer::from(Box::new(
-            SECP.sign(&msg, &sk).serialize_compact(),
+            SECP256K1.sign(&msg, &sk).serialize_compact(),
         )));
     }
 
@@ -333,13 +329,14 @@ pub fn sign_with_entropy(
     if extra_bytes.length() != 32 {
         Err(Error::BadExtraData)?
     }
-    let mut ret = ffi::Signature::new();
+
     unsafe {
+        let mut ret = ffi::Signature::new();
         // We can assume the return value because it's not possible to construct
         // an invalid signature from a valid `Message` and `SecretKey`
         assert_eq!(
             ffi::secp256k1_ecdsa_sign(
-                *SECP.ctx(),
+                *SECP256K1.ctx(),
                 &mut ret,
                 msg.as_c_ptr(),
                 sk.as_c_ptr(),
@@ -348,11 +345,10 @@ pub fn sign_with_entropy(
             ),
             1
         );
+        Ok(Buffer::from(Box::new(
+            secp256k1::Signature::from(ret).serialize_compact(),
+        )))
     }
-
-    Ok(Buffer::from(Box::new(
-        secp256k1::Signature::from(ret).serialize_compact(),
-    )))
 }
 #[wasm_bindgen]
 pub fn verify(
@@ -372,7 +368,7 @@ pub fn verify(
     if !is_strict {
         sig.normalize_s();
     }
-    match SECP.verify(&msg, &sig, &pubkey) {
+    match SECP256K1.verify(&msg, &sig, &pubkey) {
         Ok(_) => Ok(true),
         Err(_) => Ok(false),
     }
