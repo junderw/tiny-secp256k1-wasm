@@ -9,4 +9,9 @@ publish = false
 
 [dependencies]
 getrandom = "0.2.2"
+js-sys = { version = "0.3.48", optional = true }
 secp256k1-sys = "0.4.0"
+wasm-bindgen = { version = "0.2.71", optional = true }
+
+[features]
+wasm = ["getrandom/js", "js-sys", "wasm-bindgen"]

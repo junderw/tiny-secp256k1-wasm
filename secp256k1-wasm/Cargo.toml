@@ -1,0 +1,19 @@
+[package]
+name = "secp256k1-wasm"
+version = "0.0.0"
+authors = []
+edition = "2018"
+description = "A Rust library for building tiny-secp256k1 WASM"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+secp256k1 = { path = "../secp256k1", features = ["wasm"] }
+wasm-bindgen = "0.2.71"
+wee_alloc = "0.4.5"
+
+[target.'cfg(debug)'.dependencies]
+console_error_panic_hook = "0.1.6"

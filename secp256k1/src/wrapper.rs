@@ -38,6 +38,27 @@ pub enum InvalidInput {
     BadExtraData,
 }
 
+impl InvalidInput {
+    pub fn as_str(&self) -> &str {
+        use InvalidInput::*;
+        match *self {
+            BadExtraData => "Expected Extra Data (32 bytes)",
+            BadHash => "Expected Hash",
+            BadPoint => "Expected Point",
+            BadPrivate => "Expected Private",
+            BadSignature => "Expected Signature",
+            BadTweak => "Expected Tweak",
+        }
+    }
+}
+
+#[cfg(feature = "wasm")]
+impl From<InvalidInput> for wasm_bindgen::JsValue {
+    fn from(error: InvalidInput) -> Self {
+        wasm_bindgen::JsValue::from(js_sys::TypeError::new(error.as_str()))
+    }
+}
+
 pub type InvalidInputResult<T> = Result<T, InvalidInput>;
 
 pub fn get_context() -> *const secp256k1_sys::Context {
