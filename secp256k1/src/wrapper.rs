@@ -1,6 +1,5 @@
 use std::sync::Once;
 
-use rand::RngCore;
 pub use secp256k1_sys::{
     secp256k1_context_no_precomp, secp256k1_ec_pubkey_combine, secp256k1_ec_pubkey_create,
     secp256k1_ec_pubkey_tweak_add, secp256k1_ec_pubkey_tweak_mul, secp256k1_ec_seckey_negate,
@@ -55,7 +54,7 @@ pub fn get_context() -> *const secp256k1_sys::Context {
             SECP256K1_START_SIGN | SECP256K1_START_VERIFY,
         );
         let mut seed: [u8; 32] = [0; 32];
-        rand::thread_rng().fill_bytes(&mut seed);
+        getrandom::getrandom(&mut seed).expect("random seed");
         assert_eq!(secp256k1_context_randomize(ctx, seed.as_ptr()), 1);
         CONTEXT = ctx
     });

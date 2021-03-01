@@ -8,5 +8,5 @@ license = "MIT"
 publish = false
 
 [dependencies]
-rand = "0.8.3"
+getrandom = "0.2.2"
 secp256k1-sys = "0.4.0"
