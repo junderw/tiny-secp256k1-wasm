@@ -1,7 +1,7 @@
-.DS_Store
-package-lock.json
 /node_modules
 /pkg
-/rust/target
-/rust/pkg
+/target
 /tmp
+
+.DS_Store
+package-lock.json

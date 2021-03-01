@@ -1,0 +1,19 @@
+[package]
+name = "tiny-secp256k1"
+version = "0.1.0"
+authors = ["junderw <junderwood@bitcoinbank.co.jp>", "yuki-js <20838151+yuki-js@users.noreply.github.com>"]
+edition = "2018"
+description = "A Rust library for building Node.js bindings / WASM"
+license = "MIT"
+publish = false
+
+[dependencies]
+rand = "0.8.3"
+secp256k1-sys = "0.4.0"
+# TODO: use for wasm lib
+# wee_alloc = "0.4.5"
+
+[profile.release]
+lto = true
+panic = 'abort'
+codegen-units = 1
