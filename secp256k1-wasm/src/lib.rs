@@ -3,12 +3,6 @@ use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-#[cfg(debug)]
-#[wasn_bindgen(js_name = setPanicHook)]
-pub fn set_panic_hook() {
-    console_error_panic_hook::set_once();
-}
-
 type InvalidInputResult<T> = Result<T, JsValue>;
 
 #[wasm_bindgen(js_name = isPoint)]

@@ -14,6 +14,3 @@ crate-type = ["cdylib"]
 secp256k1 = { path = "../secp256k1", features = ["wasm"] }
 wasm-bindgen = "0.2.71"
 wee_alloc = "0.4.5"
-
-[target.'cfg(debug)'.dependencies]
-console_error_panic_hook = "0.1.6"
