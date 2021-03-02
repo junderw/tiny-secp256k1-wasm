@@ -5,5 +5,8 @@ members = [
 ]
 
 [profile.release]
+# https://rust-embedded.github.io/book/unsorted/speed-vs-size.html#optimize-for-size
+# Before activate "s", need to verify with benchmark that performance change is acceptable.
+# opt-level = "s"
 lto = true
 codegen-units = 1

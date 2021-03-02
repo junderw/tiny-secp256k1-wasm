@@ -9,9 +9,6 @@
   ],
   "scripts": {
     "bench": "./bin/bench.sh",
-    "build": "npm run clean && ./bin/build.sh",
-    "cargo:fmt": "cd ./rust && cargo fmt",
-    "clean": "rm -rf ./pkg",
     "unit": "tape tests/index.js | tap-difflet -p",
     "test": "npm run unit"
   },

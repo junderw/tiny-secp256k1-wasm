@@ -1,7 +1,6 @@
 /node_modules
 /pkg
 /target
-/tmp
 
 .DS_Store
 package-lock.json
